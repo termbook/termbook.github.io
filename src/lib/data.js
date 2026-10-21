@@ -170,7 +170,7 @@ export async function linkChild({ schoolId, admissionNo, code, childName }) {
 }
 
 // ---- attendance ----
-const attId = (key, date) => `${key.replace("|", "-")}_${date}`;
+const attId = (key, date) => `${key.replace(/\|/g, "-")}_${date}`;
 export function watchAttendance(key, from, to, cb) {
   return onSnapshot(query(col(sp("attendance")), where("classKey", "==", key), where("date", ">=", from), where("date", "<=", to)), (s) => {
     const m = {}; s.docs.forEach((d) => { const x = d.data(); m[x.date] = x.marks || {}; }); cb(m);
