@@ -1,0 +1,25 @@
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-padding-top:5rem}
+body{margin:0;background:var(--bg);color:var(--text);font:var(--step-0)/1.6 var(--font-body);overflow-x:hidden}
+img,svg{max-width:100%;height:auto}
+h1,h2,h3{font-family:var(--font-display);font-weight:400;line-height:1.12;margin:0 0 var(--space-4);letter-spacing:-.01em;text-wrap:balance}
+h1{font-size:var(--step-4)}h2{font-size:var(--step-3)}h3{font-size:var(--step-1)}
+p{margin:0 0 var(--space-4);max-width:62ch}
+a{color:var(--primary);text-underline-offset:3px}
+:focus-visible{outline:none;box-shadow:var(--focus);border-radius:var(--radius-sm)}
+.skip{position:absolute;left:var(--space-4);top:-4rem;background:var(--primary);color:var(--on-primary);padding:var(--space-3) var(--space-4);border-radius:var(--radius-sm);z-index:99}
+.skip:focus{top:var(--space-3)}
+.wrap{width:min(100% - 2rem,70rem);margin-inline:auto}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);min-height:44px;padding:0 var(--space-5);border:1px solid var(--border);border-radius:var(--radius-pill);background:var(--surface);color:var(--text);font:600 var(--step-0)/1 var(--font-body);text-decoration:none;cursor:pointer;transition:background var(--dur-1) var(--ease),transform var(--dur-1) var(--ease)}
+.btn:hover{background:var(--surface-2)}.btn:active{transform:scale(.98)}
+.btn[disabled]{opacity:.55;cursor:not-allowed}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.btn-primary:hover{background:var(--primary-hover)}
+.btn-icon{width:44px;padding:0}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-1);padding:var(--space-5)}
+.muted{color:var(--text-muted)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.brand{display:inline-flex;align-items:center;gap:var(--space-3);font:800 1.15rem/1 var(--font-body);color:var(--text);text-decoration:none}
+.brand img{width:36px;height:36px;border-radius:10px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+@media print{.no-print,header,nav{display:none!important}body{background:#fff;color:#000}}

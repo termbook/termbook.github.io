@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en-NG" data-theme="light">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#3B3FD1"><meta name="robots" content="noindex">
+<script src="/js/theme-init.js"></script>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png"><link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/css/tokens.css"><link rel="stylesheet" href="/css/base.css"><link rel="stylesheet" href="/css/app.css">
+<title>Termbook</title>
+</head>
+<body>
+<a class="skip" href="#view">Skip to content</a>
+<noscript><p class="card">Termbook needs JavaScript to run.</p></noscript>
+<div class="shell bare" id="shell">
+  <aside class="side no-print" aria-label="Primary"><a class="brand" href="/"><img src="/assets/icons/logo.svg" width="36" height="36" alt="">Termbook</a><nav id="side-nav" aria-label="App sections"></nav></aside>
+  <div class="main">
+    <header class="top no-print">
+      <span class="muted" id="school-name"></span>
+      <div class="top-actions">
+        <span class="chip" id="net" role="status">Online</span>
+        <button class="btn btn-icon" id="theme" type="button" aria-label="Switch to dark mode" aria-pressed="false">☾</button>
+        <button class="btn btn-sm" id="signout" type="button" hidden>Log out</button>
+      </div>
+    </header>
+    <main id="view" tabindex="-1"></main>
+  </div>
+  <nav class="tabs no-print" id="tab-nav" aria-label="App sections"></nav>
+</div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

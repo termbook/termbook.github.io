@@ -1,0 +1,36 @@
+/* Termbook design tokens. Change colours, type and spacing here. */
+@font-face{font-family:"Plus Jakarta Sans";font-weight:400;font-display:swap;src:url(/assets/fonts/plus-jakarta-sans-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Plus Jakarta Sans";font-weight:600;font-display:swap;src:url(/assets/fonts/plus-jakarta-sans-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Plus Jakarta Sans";font-weight:800;font-display:swap;src:url(/assets/fonts/plus-jakarta-sans-latin-800-normal.woff2) format("woff2")}
+@font-face{font-family:"Young Serif";font-weight:400;font-display:swap;src:url(/assets/fonts/young-serif-latin-400-normal.woff2) format("woff2")}
+:root{
+  --font-body:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-display:"Young Serif",Georgia,"Times New Roman",serif;
+  --step--1:clamp(.8rem,.78rem + .1vw,.875rem);
+  --step-0:clamp(1rem,.96rem + .2vw,1.0625rem);
+  --step-1:clamp(1.2rem,1.1rem + .5vw,1.4rem);
+  --step-2:clamp(1.5rem,1.3rem + 1vw,2rem);
+  --step-3:clamp(2rem,1.5rem + 2.4vw,3.25rem);
+  --step-4:clamp(2.5rem,1.6rem + 4vw,4.5rem);
+  --space-1:.25rem;--space-2:.5rem;--space-3:.75rem;--space-4:1rem;--space-5:1.5rem;--space-6:2rem;--space-7:3rem;--space-8:5rem;
+  --radius-sm:8px;--radius-md:14px;--radius-lg:22px;--radius-pill:999px;
+  --z-header:20;--z-nav:30;--z-modal:50;--z-toast:60;
+  --ease:cubic-bezier(.2,.7,.2,1);--dur-1:120ms;--dur-2:240ms;
+  --primary:#3B3FD1;--primary-hover:#2F33B8;--primary-soft:#ECEDFF;--on-primary:#fff;
+  --accent:#F2A93B;--accent-soft:#FFF2DB;
+  --success:#117A4D;--success-soft:#E1F5EA;--warning:#9A5B00;--warning-soft:#FFF0D1;--error:#B3261E;--error-soft:#FDE8E6;--info:#1B5FB8;--info-soft:#E3EEFB;
+  --bg:#F6F7FB;--surface:#fff;--surface-2:#EEF0F7;--border:#DADEEA;--text:#161A2E;--text-muted:#505774;
+  --shadow-1:0 1px 2px rgba(22,26,46,.06),0 1px 1px rgba(22,26,46,.04);
+  --shadow-2:0 12px 32px -12px rgba(22,26,46,.22);
+  --focus:0 0 0 3px #fff,0 0 0 5px var(--primary);
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --primary:#8C90FF;--primary-hover:#A4A7FF;--primary-soft:#23264F;--on-primary:#0F1130;
+  --accent:#F5B957;--accent-soft:#3A2D12;
+  --success:#4CD08F;--success-soft:#12301F;--warning:#F2B24C;--warning-soft:#3A2B0E;--error:#FF8F86;--error-soft:#3D1814;--info:#7DB4F5;--info-soft:#14283F;
+  --bg:#0E1020;--surface:#171A30;--surface-2:#20243F;--border:#2E3354;--text:#EEF0FB;--text-muted:#A5ABCB;
+  --shadow-1:0 1px 2px rgba(0,0,0,.4);--shadow-2:0 12px 32px -12px rgba(0,0,0,.6);
+  --focus:0 0 0 3px #0E1020,0 0 0 5px var(--primary);
+  color-scheme:dark;
+}

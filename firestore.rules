@@ -1,0 +1,161 @@
+rules_version = '2';
+// Termbook security rules. Deny by default; every grant below is the minimum a role needs.
+// ONE EDIT REQUIRED: replace the text between the quotes in ownerUid() with YOUR Firebase user UID
+// (docs/FIREBASE_LOGIN_SETUP.md, step "Create the Owner account").
+service cloud.firestore {
+  match /databases/{db}/documents {
+
+    function ownerUid() { return 'REPLACE_WITH_OWNER_UID'; }
+    function signedIn() { return request.auth != null; }
+    function verified() { return signedIn() && request.auth.token.email_verified == true; }
+    function isOwner() { return verified() && request.auth.uid == ownerUid(); }
+    function meDoc() { return get(/databases/$(db)/documents/users/$(request.auth.uid)).data; }
+    function hasProfile() { return exists(/databases/$(db)/documents/users/$(request.auth.uid)); }
+    function isAdmin(sid) { return verified() && hasProfile() && meDoc().role == 'admin' && meDoc().schoolId == sid && meDoc().status == 'active'; }
+    function isTeacher(sid) { return verified() && hasProfile() && meDoc().role == 'teacher' && meDoc().schoolId == sid && meDoc().status == 'active'; }
+    function staff(sid) { return isOwner() || isAdmin(sid) || isTeacher(sid); }
+    // classKey is "CLASS|ARM", e.g. "SS2|A". classKeys on a teacher's user doc lists every class they may see.
+    function seesClass(sid, key) { return isOwner() || isAdmin(sid) || (isTeacher(sid) && key in meDoc().classKeys); }
+    function isClassTeacher(sid, key) { return isOwner() || isAdmin(sid) || (isTeacher(sid) && meDoc().classTeacherKey == key); }
+    function teachesSubject(sid, subject, key) { return isOwner() || isAdmin(sid) || (isTeacher(sid) && (subject + '|' + key) in meDoc().assignments); }
+    function requireVerification() { return get(/databases/$(db)/documents/config/platform).data.requireVerification == true; }
+    function termPublished(sid, termId) { return get(/databases/$(db)/documents/schools/$(sid)/terms/$(termId)).data.published == true; }
+
+    match /config/{doc} {
+      allow read: if signedIn();
+      allow write: if isOwner();
+    }
+
+    // Minimal public directory used by the registration dropdowns. Holds no private data.
+    match /publicSchools/{sid} {
+      allow read: if true;
+      allow create: if isOwner() || (isAdmin(sid) && !requireVerification()
+        && request.resource.data.keys().hasOnly(['name', 'state', 'lga', 'structure']));
+      allow update: if isOwner() || (isAdmin(sid)
+        && get(/databases/$(db)/documents/schools/$(sid)).data.status == 'verified'
+        && request.resource.data.keys().hasOnly(['name', 'state', 'lga', 'structure'])
+        && request.resource.data.state == resource.data.state && request.resource.data.lga == resource.data.lga);
+      allow delete: if isOwner();
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner()
+        || (verified() && request.auth.uid == uid)
+        || (verified() && hasProfile() && meDoc().role == 'admin' && meDoc().status == 'active'
+            && resource.data.schoolId == meDoc().schoolId);
+      allow create: if isOwner()
+        || (verified() && request.auth.uid == uid
+            && request.resource.data.uid == uid
+            && request.resource.data.role in ['admin', 'teacher', 'parent']
+            && ((request.resource.data.role == 'admin'
+                 && request.resource.data.status == 'active'
+                 && getAfter(/databases/$(db)/documents/schools/$(request.resource.data.schoolId)).data.adminUid == uid)
+             || (request.resource.data.role == 'teacher'
+                 && request.resource.data.status == 'pending'
+                 && request.resource.data.classKeys == []
+                 && request.resource.data.assignments == []
+                 && request.resource.data.classTeacherKey == null
+                 && exists(/databases/$(db)/documents/publicSchools/$(request.resource.data.schoolId)))
+             || (request.resource.data.role == 'parent'
+                 && request.resource.data.status == 'active')));
+      allow update: if isOwner()
+        || (verified() && request.auth.uid == uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'phone', 'dob', 'requested', 'links']))
+        || (isAdmin(resource.data.schoolId) && resource.data.role == 'teacher'
+            && request.resource.data.role == 'teacher'
+            && request.resource.data.schoolId == resource.data.schoolId
+            && request.resource.data.uid == resource.data.uid);
+      allow delete: if isOwner();
+    }
+
+    match /schools/{sid} {
+      allow read: if isOwner() || isAdmin(sid) || isTeacher(sid);
+      allow create: if verified() && request.resource.data.adminUid == request.auth.uid
+        && ((request.resource.data.status == 'pending')
+            || (request.resource.data.status == 'verified' && !requireVerification()));
+      allow update: if isOwner()
+        || (isAdmin(sid)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+                 ['name', 'type', 'address', 'phone', 'email', 'structure', 'scoring', 'current', 'settings']));
+      allow delete: if false;
+
+      match /students/{id} {
+        allow read: if seesClass(sid, resource.data.classKey)
+          || (verified() && hasProfile() && meDoc().role == 'parent'
+              && exists(/databases/$(db)/documents/schools/$(sid)/links/$(request.auth.uid + '_' + id)));
+        allow create: if isOwner() || isAdmin(sid)
+          || (isClassTeacher(sid, request.resource.data.classKey) && request.resource.data.status == 'pending');
+        allow update: if isOwner() || isAdmin(sid)
+          || (isClassTeacher(sid, resource.data.classKey) && request.resource.data.classKey == resource.data.classKey
+              && request.resource.data.status == resource.data.status);
+        allow delete: if false; // students are soft-deleted (deleted: true), never hard-deleted
+
+        match /private/{doc} {
+          allow read, write: if isOwner() || isAdmin(sid)
+            || isClassTeacher(sid, get(/databases/$(db)/documents/schools/$(sid)/students/$(id)).data.classKey);
+        }
+      }
+
+      match /accessCodes/{studentId} {
+        allow read, write: if isOwner() || isAdmin(sid);
+      }
+
+      // A parent links to a child by creating this document. The code is compared by the rules, never sent back.
+      match /links/{linkId} {
+        allow read: if isOwner() || isAdmin(sid) || (verified() && resource.data.uid == request.auth.uid);
+        allow create: if verified() && hasProfile() && meDoc().role == 'parent'
+          && request.resource.data.uid == request.auth.uid
+          && linkId == request.auth.uid + '_' + request.resource.data.studentId
+          && get(/databases/$(db)/documents/schools/$(sid)/accessCodes/$(request.resource.data.studentId)).data.active == true
+          && get(/databases/$(db)/documents/schools/$(sid)/accessCodes/$(request.resource.data.studentId)).data.code == request.resource.data.code;
+        allow delete: if isOwner() || isAdmin(sid) || (verified() && resource.data.uid == request.auth.uid);
+        allow update: if false;
+      }
+
+      match /attendance/{docId} {
+        allow read, write: if isClassTeacher(sid, resource == null ? request.resource.data.classKey : resource.data.classKey);
+      }
+
+      match /holidays/{date} {
+        allow read: if staff(sid);
+        allow write: if isOwner() || isAdmin(sid);
+      }
+
+      match /terms/{termId} {
+        allow read: if staff(sid);
+        allow write: if isOwner() || isAdmin(sid);
+      }
+
+      // One document per subject + class + arm + session. Only that subject's teacher, the admin and the owner write.
+      // The class teacher and admin can read every subject for their class.
+      match /sheets/{sheetId} {
+        allow read: if isOwner() || isAdmin(sid)
+          || (isTeacher(sid) && (resource.data.classKey == meDoc().classTeacherKey
+                                 || (resource.data.subject + '|' + resource.data.classKey) in meDoc().assignments));
+        allow create: if teachesSubject(sid, request.resource.data.subject, request.resource.data.classKey);
+        allow update: if teachesSubject(sid, resource.data.subject, resource.data.classKey)
+          && request.resource.data.subject == resource.data.subject
+          && request.resource.data.classKey == resource.data.classKey;
+        allow delete: if isOwner() || isAdmin(sid);
+      }
+
+      // Compiled report cards. Parents read their own child's report only after the term is published.
+      match /reports/{reportId} {
+        allow read: if isOwner() || isAdmin(sid)
+          || (isTeacher(sid) && resource.data.classKey == meDoc().classTeacherKey)
+          || (verified() && hasProfile() && meDoc().role == 'parent'
+              && termPublished(sid, resource.data.termId)
+              && exists(/databases/$(db)/documents/schools/$(sid)/links/$(request.auth.uid + '_' + resource.data.studentId)));
+        allow write: if isOwner() || isAdmin(sid);
+      }
+    }
+
+    // Audit log: members add entries, only admins and the owner read them, nobody edits or deletes.
+    match /audit/{id} {
+      allow create: if verified() && request.resource.data.uid == request.auth.uid
+        && (isOwner() || staff(request.resource.data.schoolId));
+      allow read: if isOwner() || isAdmin(resource.data.schoolId);
+      allow update, delete: if false;
+    }
+  }
+}
