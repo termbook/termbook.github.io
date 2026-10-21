@@ -45,12 +45,24 @@ export function forgotView() {
 
 export function verifyView(user, onDone) {
   const out = h("p", { role: "status", hidden: true });
-  return card(h("h1", {}, "Check your email"), h("p", {}, "We sent a verification link to ", h("strong", {}, user.email), ". Open it, then come back and press the button below."),
+  let timer = null;
+  const stop = () => { clearInterval(timer); window.removeEventListener("focus", check); };
+  async function check(manual) {
+    if (auth.currentUser?.uid !== user.uid) return stop();
+    try {
+      await user.reload();
+      if (user.emailVerified) { stop(); await user.getIdToken(true); onDone(); }
+      else if (manual === true) msg(out, "Not verified yet. Open the link in the email first. If it says the link was already used, wait a few seconds and press this again.", "error");
+    } catch (e) { if (manual === true) msg(out, friendlyAuthError(e)); }
+  }
+  timer = setInterval(check, 4000);
+  window.addEventListener("focus", check);
+  return card(h("h1", {}, "Check your email"), h("p", {}, "We sent a verification link to ", h("strong", {}, user.email), ". Open it, then come back here."),
     out,
     h("div", { class: "stack" },
-      h("button", { class: "btn btn-primary", type: "button", onclick: async () => { await user.reload(); if (user.emailVerified) { await user.getIdToken(true); onDone(); } else msg(out, "Not verified yet. Open the link in the email first.", "error"); } }, "I have verified my email"),
-      h("button", { class: "btn", type: "button", onclick: async () => { try { await sendEmailVerification(user); msg(out, "Sent again. Check your inbox and spam folder.", "ok"); } catch (e) { msg(out, friendlyAuthError(e)); } } }, "Send the link again"),
-      h("button", { class: "btn", type: "button", onclick: () => signOut(auth) }, "Use a different account")));
+      h("button", { class: "btn btn-primary", type: "button", onclick: () => check(true) }, "I have verified my email"),
+      h("button", { class: "btn", type: "button", onclick: async () => { try { await sendEmailVerification(user); msg(out, "Sent again. Open only the newest email.", "ok"); } catch (e) { msg(out, friendlyAuthError(e)); } } }, "Send the link again"),
+      h("button", { class: "btn", type: "button", onclick: () => { stop(); signOut(auth); } }, "Use a different account")));
 }
 
 export function waitingView(kind, user) {
