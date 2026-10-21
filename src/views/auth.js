@@ -46,7 +46,7 @@ export function forgotView() {
 export function verifyView(user, onDone) {
   const out = h("p", { role: "status", hidden: true });
   let timer = null;
-  const stop = () => { clearInterval(timer); window.removeEventListener("focus", check); };
+  const stop = () => { window.clearInterval(timer); window.removeEventListener("focus", check); };
   async function check(manual) {
     if (auth.currentUser?.uid !== user.uid) return stop();
     try {
@@ -55,7 +55,7 @@ export function verifyView(user, onDone) {
       else if (manual === true) msg(out, "Not verified yet. Open the link in the email first. If it says the link was already used, wait a few seconds and press this again.", "error");
     } catch (e) { if (manual === true) msg(out, friendlyAuthError(e)); }
   }
-  timer = setInterval(check, 4000);
+  timer = window.setInterval(check, 4000);
   window.addEventListener("focus", check);
   return card(h("h1", {}, "Check your email"), h("p", {}, "We sent a verification link to ", h("strong", {}, user.email), ". Open it, then come back here."),
     out,
