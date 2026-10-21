@@ -14,7 +14,7 @@
     "lint": "eslint src tests"
   },
   "dependencies": {
-    "firebase": "^11.0.0",
+    "firebase": "^13.0.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
