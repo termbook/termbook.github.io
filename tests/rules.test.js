@@ -5,7 +5,11 @@ import { readFileSync } from "node:fs";
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, query, collection, where } from "firebase/firestore";
 
 let env;
-const rules = readFileSync("firestore.rules", "utf8").replace("REPLACE_WITH_OWNER_UID", "owner1");
+const rules = readFileSync("firestore.rules", "utf8").replace(
+  /(function ownerUid\(\) \{ return ')[^']*(';)/,
+  "$1owner1$2"
+);
+if (!rules.includes("return 'owner1';")) throw new Error("Could not set the test owner UID in firestore.rules");
 const as = (uid, claims = {}) => env.authenticatedContext(uid, { email_verified: true, email: `${uid}@example.com`, ...claims }).firestore();
 const T = (extra) => ({ role: "teacher", schoolId: "s1", status: "active", classKeys: [], assignments: [], classTeacherKey: null, ...extra });
 
