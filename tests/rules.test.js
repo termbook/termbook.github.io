@@ -5,11 +5,9 @@ import { readFileSync } from "node:fs";
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, query, collection, where } from "firebase/firestore";
 
 let env;
-const rules = readFileSync("firestore.rules", "utf8").replace(
-  /(function ownerUid\(\) \{ return ')[^']*(';)/,
-  "$1owner1$2"
-);
-if (!rules.includes("return 'owner1';")) throw new Error("Could not set the test owner UID in firestore.rules");
+// Whatever UID is in the file (the placeholder or the real owner's), the tests use their own owner, "owner1".
+const rules = readFileSync("firestore.rules", "utf8").replace(/function ownerUid\(\) \{ return '[^']*'; \}/, "function ownerUid() { return 'owner1'; }");
+if (!rules.includes("return 'owner1'")) throw new Error("Could not find ownerUid() in firestore.rules");
 const as = (uid, claims = {}) => env.authenticatedContext(uid, { email_verified: true, email: `${uid}@example.com`, ...claims }).firestore();
 const T = (extra) => ({ role: "teacher", schoolId: "s1", status: "active", classKeys: [], assignments: [], classTeacherKey: null, ...extra });
 

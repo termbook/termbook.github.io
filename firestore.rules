@@ -1,6 +1,6 @@
 rules_version = '2';
 // Termbook security rules. Deny by default; every grant below is the minimum a role needs.
-// ONE EDIT REQUIRED: replace the text between the quotes in ownerUid() with YOUR Firebase user UID
+// The text between the quotes in ownerUid() is the Firebase user UID of the platform owner
 // (docs/FIREBASE_LOGIN_SETUP.md, step "Create the Owner account").
 service cloud.firestore {
   match /databases/{db}/documents {
