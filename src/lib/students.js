@@ -47,22 +47,64 @@ export function filterStudents(list, { q = "", cls = "", status = "active", show
     && (!needle || s.name.toLowerCase().includes(needle) || String(s.admissionNo || "").toLowerCase().includes(needle)));
 }
 
-/** Parses a pasted list or CSV into student rows. Columns: name, gender (M/F), admission number (optional), repeater (R/yes, optional). */
+/** Splits one CSV/TSV line, honouring double quotes. */
+function splitLine(line) {
+  const out = []; let cur = "", q = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (q) { if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+    else if (ch === '"') q = true; else if (ch === "," || ch === "\t" || ch === ";") { out.push(cur.trim()); cur = ""; } else cur += ch;
+  }
+  out.push(cur.trim()); return out;
+}
+const HEADERS = [["name", /^(full ?name|name|surname|student( name)?)$/i], ["gender", /^(gender|sex)$/i], ["class", /^class$/i], ["arm", /^arm$/i], ["admissionNo", /^(admission( no\.?| number)?|adm\.? ?no\.?)$/i],
+  ["repeater", /^repeater$/i], ["dob", /^(date of birth|dob|birth ?date)$/i], ["status", /^status$/i], ["parentName", /^(parent|guardian|parent\/guardian|parent or guardian)( name)?$/i],
+  ["address", /^address$/i], ["phone", /^(parent'?s? )?(phone|phone number|mobile|parent phone( number)?|guardian phone)$/i]];
+const toIsoDate = (v) => { const t = String(v || "").trim(); let m = t.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/); if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`; m = t.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? t : ""; };
+const toPhone = (v) => { const d = String(v || "").replace(/[\s-]/g, ""); if (/^[789][01]\d{8}$/.test(d)) return "0" + d; return /^(0[789][01]\d{8}|\+234[789][01]\d{8})$/.test(d) ? d : ""; };
+
+/**
+ * Parses a pasted list or CSV into student rows.
+ * With a header row (Name, Gender, Class, Arm, Admission no., Repeater, Date of birth, Parent name, Address, Phone) columns are matched by name.
+ * Without one: name first, then gender (M/F), an admission number and R for repeater in any order.
+ */
 export function parseStudentRows(text) {
-  const out = [];
-  for (const line of String(text).split(/\r?\n/)) {
-    const cells = line.split(/[,\t;]/).map((x) => x.trim());
-    const name = (cells[0] || "").replace(/^\d+[.)]\s*/, "");
-    if (!name || /^(name|surname|full name)$/i.test(name)) continue;
-    let gender = "", admissionNo = "", repeater = false;
-    for (const c of cells.slice(1)) {
-      const l = c.toLowerCase();
-      if (l === "m" || l === "male") gender = "M";
-      else if (l === "f" || l === "female") gender = "F";
-      else if (l === "r" || l === "repeater" || l === "yes") repeater = true;
-      else if (c) admissionNo = c;
+  return parseStudentTable(String(text).replace(/^\uFEFF/, "").split(/\r?\n/).filter((l) => l.trim()).map(splitLine));
+}
+
+/** Same as parseStudentRows but for rows already split into cells (CSV or Excel files). */
+export function parseStudentTable(table) {
+  const out = []; let map = null; let first = true;
+  for (const cells0 of table) {
+    const cells = cells0.map((c) => String(c ?? "").trim()); if (!cells.some(Boolean)) continue; const i = first ? 0 : 1; first = false;
+    if (i === 0 && cells.some((c) => HEADERS[0][1].test(c)) && cells.length > 1) { map = {}; cells.forEach((c, idx) => { const h = HEADERS.find(([, re]) => re.test(c.trim())); if (h && !(h[0] in map)) map[h[0]] = idx; }); continue; }
+    if (map) {
+      const g = (k) => (map[k] === undefined ? "" : cells[map[k]] || "");
+      const name = normName(g("name").replace(/^\d+[.)]\s*/, "")); if (!name) continue;
+      const gl = g("gender").toLowerCase(); const rep = g("repeater").toLowerCase();
+      out.push({ name, gender: gl.startsWith("m") ? "M" : gl.startsWith("f") ? "F" : "", admissionNo: g("admissionNo"), repeater: ["r", "yes", "y", "repeater", "true"].includes(rep),
+        class: g("class").toUpperCase().replace(/\s+/g, ""), arm: g("arm").trim(), dob: toIsoDate(g("dob")), dobBad: Boolean(g("dob")) && !toIsoDate(g("dob")), parentName: g("parentName"), address: g("address"), phone: toPhone(g("phone")), phoneBad: Boolean(g("phone")) && !toPhone(g("phone")) });
+      continue;
     }
+    const name = (cells[0] || "").replace(/^\d+[.)]\s*/, ""); if (!name) continue;
+    let gender = "", admissionNo = "", repeater = false;
+    for (const c of cells.slice(1)) { const l = c.toLowerCase(); if (l === "m" || l === "male") gender = "M"; else if (l === "f" || l === "female") gender = "F"; else if (l === "r" || l === "repeater" || l === "yes") repeater = true; else if (c) admissionNo = c; }
     out.push({ name: normName(name), gender, admissionNo, repeater });
   }
   return out;
 }
+
+/** Reads an uploaded .csv/.txt (as text, so dates stay exactly as typed) or .xlsx/.xls (through SheetJS) into table rows. */
+export async function readStudentFile(file) {
+  const name = file.name.toLowerCase(); const buf = await file.arrayBuffer();
+  if (/\.(xlsx|xls)$/.test(name)) {
+    const XLSX = await import("xlsx"); const wb = XLSX.read(buf, { type: "array", cellDates: true }); const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" });
+    return rows.map((r) => r.map((v) => (v instanceof Date ? new Date(v.getTime() + 12 * 3600e3).toISOString().slice(0, 10) : v)));
+  }
+  let text; try { text = new TextDecoder("utf-8", { fatal: true }).decode(buf); } catch { text = new TextDecoder("windows-1252").decode(buf); }
+  return text.replace(/^\uFEFF/, "").split(/\r?\n/).filter((l) => l.trim()).map(splitLine);
+}
+
+/** Column headings of the downloadable students template. Keep in step with the import reader above. */
+export const TEMPLATE_HEADERS = ["Name", "Gender", "Class", "Arm", "Admission no.", "Repeater", "Date of birth", "Parent/guardian name", "Address", "Parent phone"];

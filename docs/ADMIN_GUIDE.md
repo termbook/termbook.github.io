@@ -12,7 +12,7 @@ Open **Teachers**. New requests wait under "Waiting for approval". Click **Revie
 
 ## Students
 Open **Students** to see everyone in your school.
-- **Add student** one by one, or **Paste or import list** (one line per student: `SURNAME Firstname, F, 2026/00123, R`; gender M or F, admission number and R for repeater are optional). A CSV file works too. Pick the class and arm first.
+- **Add student** one by one, or **Paste or import list** and tap **Download the blank template** (also on the Students page as **Download template**), fill it, and choose it (an Excel file works too). The file is read directly, column by column: Name, Gender, Class, Arm, Admission no., Repeater (R), Date of birth (DD/MM/YYYY), Parent/guardian name, Address, Parent phone. Before adding, you see how many students were found and any problems. Rows with a valid Class and Arm go to that class; the class you pick in the window is used for any row without one. You can also type a list: `SURNAME Firstname, F, 2026/00123, R`.
 - Filter by class and status, and search by name or admission number.
 - Tick students, then use the bar at the top:
   - **Promote** moves each to the next class (the same arm if it exists). SS3 students become **Graduated**. You confirm first.

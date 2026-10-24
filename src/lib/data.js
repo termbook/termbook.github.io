@@ -102,9 +102,13 @@ export async function addStudent(s, priv) {
   await b.commit(); await audit("student_add", r.id, { name: s.name }); return r.id;
 }
 export async function addStudents(list) {
-  for (let i = 0; i < list.length; i += 200) {
+  for (let i = 0; i < list.length; i += 100) {
     const b = writeBatch(db);
-    for (const s of list.slice(i, i + 200)) b.set(doc(db, sp(`students/${studentIdFor(s.admissionNo)}`)), { ...s, classKey: classKey(s.class, s.arm), deleted: false, schoolId: effectiveSchoolId(), createdAt: serverTimestamp() });
+    for (const { _priv, ...s } of list.slice(i, i + 100)) {
+      const r = doc(db, sp(`students/${studentIdFor(s.admissionNo)}`));
+      b.set(r, { ...s, classKey: classKey(s.class, s.arm), deleted: false, schoolId: effectiveSchoolId(), createdAt: serverTimestamp() });
+      if (_priv && (_priv.address || _priv.phone)) b.set(doc(db, `${r.path}/private/info`), _priv);
+    }
     await b.commit();
   }
   await audit("student_bulk_add", sp("students"), { count: list.length });

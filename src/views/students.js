@@ -1,7 +1,7 @@
 import { h, mount, toast, confirmDialog, formDialog, field, empty, skeleton, downloadCsv, initials } from "../lib/dom.js";
 import { state, roleOf, effectiveSchoolId } from "../lib/store.js";
 import { watchStudents, addStudent, addStudents, updateStudent, bulkStudentAction, loadPrivate, issueAccessCode, revokeAccess, loadAccessCode, studentIdFor } from "../lib/data.js";
-import { STATUS, LEFT_REASONS, classKey, promotionTarget, findDuplicates, filterStudents, parseStudentRows, makeAdmissionNo, makeAccessCode, normName } from "../lib/students.js";
+import { STATUS, LEFT_REASONS, classKey, promotionTarget, findDuplicates, filterStudents, parseStudentRows, parseStudentTable, readStudentFile, TEMPLATE_HEADERS, makeAdmissionNo, makeAccessCode, normName } from "../lib/students.js";
 import { input, select, classPicker, allArms, classLabel, friendlyAuthError } from "./common.js";
 import { showDate, parseShown, validPhone } from "../lib/dates.js";
 import { autoParent } from "../lib/attendance.js";
@@ -49,6 +49,7 @@ export function studentsView(host) {
     mount(body,
       h("div", { class: "toolbar" }, canAdd ? h("button", { class: "btn btn-primary", type: "button", onclick: () => editDialog(null) }, "Add student") : null,
         canAdd ? h("button", { class: "btn", type: "button", onclick: bulkAddDialog }, "Paste or import list") : null,
+        canAdd ? h("button", { class: "btn", type: "button", onclick: () => downloadCsv("students-template.csv", [TEMPLATE_HEADERS]) }, "Download template") : null,
         h("button", { class: "btn", type: "button", onclick: () => exportCsv(rows) }, "Export CSV")),
       h("div", { class: "filters" }, search, select(classOpts, ui.cls, { "aria-label": "Class", onchange: (e) => { ui.cls = e.target.value; ui.page = 0; draw(); } }),
         select(statusOpts, ui.status, { "aria-label": "Status", onchange: (e) => { ui.status = e.target.value; ui.page = 0; draw(); } }),
@@ -127,21 +128,41 @@ export function studentsView(host) {
   }
 
   function bulkAddDialog() {
-    const cp = addKeys ? h("input", { value: classLabel(addKeys), disabled: true }) : classPicker(structure, "");
-    const ta = h("textarea", { rows: 8, placeholder: "ADEBAYO Temitope, F\nBELLO Aminat, F, R\nOKAFOR Chinedu, M, 2026/00123", "aria-label": "Student list" });
-    const file = h("input", { type: "file", accept: ".csv,.txt,text/csv", "aria-label": "Import a CSV file", onchange: async (e) => { const f = e.target.files[0]; if (f) ta.value = await f.text(); } });
+    const cp = addKeys ? h("input", { value: classLabel(addKeys), disabled: true, "aria-label": "Class" }) : classPicker(structure, "", { blank: "Class and arm (used when the file has none)" });
+    const ta = h("textarea", { rows: 6, placeholder: "Or type or paste here, one student per line:\nADEBAYO Temitope, F\nBELLO Aminat, F, 2026/00123, R", "aria-label": "Student list" });
+    let fileRows = null; const info = h("div", { class: "fileinfo", hidden: true, "aria-live": "polite" });
     const out = h("p", { class: "form-msg", role: "alert", hidden: true });
+    const fail = (t) => { out.textContent = t; out.className = "form-msg error"; out.hidden = false; };
+    const file = h("input", { type: "file", accept: ".csv,.txt,.xlsx,.xls,text/csv", "aria-label": "Choose a CSV or Excel file", onchange: async (e) => {
+      out.hidden = true; const f = e.target.files[0]; if (!f) return;
+      try { const table = await readStudentFile(f); fileRows = parseStudentTable(table); ta.value = ""; showInfo(f.name); } catch { fileRows = null; info.hidden = true; fail("Could not read that file. Save it as CSV or Excel and try again."); }
+    } });
+    const rowsNow = () => fileRows || parseStudentRows(ta.value);
+    function showInfo(name) {
+      const r = fileRows; const noGender = r.filter((x) => !x.gender).length, badDob = r.filter((x) => x.dobBad).length, badPh = r.filter((x) => x.phoneBad).length;
+      const problems = [noGender && `${noGender} without a gender (they will be set to Male: fix them afterwards)`, badDob && `${badDob} with a date of birth that is not DD/MM/YYYY (left blank)`, badPh && `${badPh} with a phone number that is not valid (left blank)`].filter(Boolean);
+      mount(info, h("p", {}, h("strong", {}, `${name}: ${r.length} student${r.length === 1 ? "" : "s"} found`)), problems.length ? h("ul", {}, problems.map((x) => h("li", {}, x))) : h("p", { class: "muted" }, "Everything in the file was read correctly."),
+        h("button", { class: "btn btn-sm", type: "button", onclick: () => { fileRows = null; file.value = ""; info.hidden = true; } }, "Remove file")); info.hidden = false;
+    }
+    const validKey = (c, a) => structure.classes.some((x) => x.name === c && x.arms.includes(a)) ? classKey(c, a) : "";
     formDialog("Add many students", (close) => h("form", { novalidate: true, onsubmit: async (e) => {
-      e.preventDefault(); const key = addKeys || cp.value; if (!key) { out.textContent = "Choose a class and arm."; out.className = "form-msg error"; out.hidden = false; return; }
-      const rows = parseStudentRows(ta.value); if (!rows.length) { out.textContent = "Paste at least one name."; out.className = "form-msg error"; out.hidden = false; return; }
-      const [c, a] = key.split("|"); const taken = new Set(all.map((x) => x.admissionNo)); const skipped = []; const list = [];
-      for (const r of rows) { if (r.admissionNo && taken.has(r.admissionNo)) { skipped.push(r.name); continue; } const adm = r.admissionNo || makeAdmissionNo(taken); taken.add(adm);
-        list.push({ name: r.name, gender: r.gender || "M", repeater: r.repeater, admissionNo: adm, class: c, arm: a, status: isAdmin ? "active" : "pending", parentName: "", dob: "" }); }
-      const noGender = rows.filter((r) => !r.gender).length;
-      if (!await confirmDialog({ title: `Add ${list.length} student(s) to ${classLabel(key)}?`, body: `${noGender ? noGender + " have no gender and will be set to Male; fix them afterwards. " : ""}${skipped.length ? skipped.length + " skipped because the admission number already exists. " : ""}${isAdmin ? "" : "They will wait for the admin to confirm."}`, confirmLabel: "Add" })) return;
-      try { await addStudents(list); toast(`${list.length} students added`); close("ok"); } catch (err) { out.textContent = friendlyAuthError(err); out.className = "form-msg error"; out.hidden = false; }
-    } }, h("p", { class: "muted" }, "One student per line: name (surname first), gender M or F, then optionally an admission number and R for repeater. You can also import a CSV file."),
-      field("Class and arm", cp), ta, field("Or import a file", file), out, h("div", { class: "dlg-actions" }, h("button", { class: "btn", type: "button", onclick: () => close("no") }, "Cancel"), h("button", { class: "btn btn-primary", type: "submit" }, "Review and add"))));
+      e.preventDefault(); out.hidden = true; const rows = rowsNow(); if (!rows.length) return fail("Choose a file or type at least one name.");
+      const dlg = addKeys || cp.value; const taken = new Set(all.map((x) => x.admissionNo)); const list = [], skipped = [], wrongClass = [];
+      for (const r of rows) {
+        const key = (r.class && r.arm ? validKey(r.class, r.arm) : "") || dlg;
+        if (!key) { wrongClass.push(r.name); continue; } if (addKeys && key !== addKeys) { wrongClass.push(r.name); continue; }
+        if (r.admissionNo && taken.has(r.admissionNo)) { skipped.push(r.name); continue; }
+        const adm = r.admissionNo || makeAdmissionNo(taken); taken.add(adm); const [c, a] = key.split("|");
+        list.push({ name: r.name, gender: r.gender || "M", repeater: Boolean(r.repeater), admissionNo: adm, class: c, arm: a, status: isAdmin ? "active" : "pending", parentName: r.parentName || "", dob: r.dob || "", _priv: { address: r.address || "", phone: r.phone || "", religion: "" } });
+      }
+      if (!list.length) return fail(wrongClass.length ? "No students could be placed. Choose a class and arm, or check the Class and Arm columns." : "Nothing to add.");
+      const notes = [skipped.length && `${skipped.length} skipped because the admission number already exists.`, wrongClass.length && `${wrongClass.length} skipped because their class or arm ${addKeys ? "is not your class" : "is missing or not in your school's list"}.`, !isAdmin && "They will wait for the admin to confirm."].filter(Boolean).join(" ");
+      if (!await confirmDialog({ title: `Add ${list.length} student(s)?`, body: notes || "Check the list, then confirm.", confirmLabel: "Add" })) return;
+      try { await addStudents(list); toast(`${list.length} students added`); close("ok"); } catch (err) { fail(friendlyAuthError(err)); }
+    } }, h("p", { class: "muted" }, "Choose the filled students file (CSV or Excel). It is read exactly as saved: name, gender, class, arm, admission number, repeater, date of birth and, if present, parent name, address and parent phone."),
+      h("p", {}, h("button", { class: "btn btn-sm", type: "button", onclick: () => downloadCsv("students-template.csv", [TEMPLATE_HEADERS]) }, "Download the blank template")),
+      field("Student file", file), info, field("Class and arm", cp, "Used for any student whose row has no valid Class and Arm."), ta, out,
+      h("div", { class: "dlg-actions" }, h("button", { class: "btn", type: "button", onclick: () => close("no") }, "Cancel"), h("button", { class: "btn btn-primary", type: "submit" }, "Review and add"))));
   }
 
   unsub?.(); unsub = watchStudents((list, err) => { if (err) return mount(body, empty("Cannot load students", friendlyAuthError(err))); state.students = list; all = list; draw(); });

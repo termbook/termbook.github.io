@@ -29,7 +29,7 @@ describe("students", () => {
     expect(filterStudents(l, { q: "c d", status: "all" })).toHaveLength(1);
   });
   it("parses pasted lists and CSV", () => {
-    expect(parseStudentRows("Name,Gender\nade bola,F,2026/9\n2. tunde ola, m, r")).toEqual([
+    expect(parseStudentRows("ade bola,F,2026/9\n2. tunde ola, m, r")).toEqual([
       { name: "ADE BOLA", gender: "F", admissionNo: "2026/9", repeater: false }, { name: "TUNDE OLA", gender: "M", admissionNo: "", repeater: true }]);
   });
   it("makes unambiguous access codes and unique admission numbers", () => {
@@ -45,4 +45,18 @@ describe("students", () => {
     expect(data.states).toHaveLength(37);
     expect(data.states.reduce((n, s) => n + s.lgas.length, 0)).toBe(774);
   });
+});
+
+import { parseStudentTable, parseStudentRows as parseText } from "../src/lib/students.js";
+describe("student file import", () => {
+  const csv = '\uFEFFName,Gender,Class,Arm,Admission no.,Status,Repeater,Date of birth,Parent/guardian name,Address,Parent phone\n"ADEBAYO, Temitope",F,SS1,A,2026/001,Active,R,05/01/2010,Mr Adebayo,"12 Ojo Road, Agbirigidi",8031234567\nBELLO Aminat,Female,ss1,a,,,,2011-03-09,,,12345\n';
+  it("reads every column of the template by its header", () => {
+    const r = parseText(csv);
+    expect(r[0]).toMatchObject({ name: "ADEBAYO, TEMITOPE", gender: "F", class: "SS1", arm: "A", admissionNo: "2026/001", repeater: true, dob: "2010-01-05", parentName: "Mr Adebayo", address: "12 Ojo Road, Agbirigidi", phone: "08031234567" });
+    expect(r[1]).toMatchObject({ name: "BELLO AMINAT", gender: "F", class: "SS1", arm: "a", admissionNo: "", repeater: false, dob: "2011-03-09", phone: "", phoneBad: true });
+  });
+  it("ignores empty rows, the Status column and keeps dates as DD/MM/YYYY", () => {
+    expect(parseStudentTable([["Name", "Gender", "Status", "Date of birth"], ["", "", "", ""], ["A B", "m", "Active", "31/12/2009"]])).toEqual([expect.objectContaining({ name: "A B", gender: "M", dob: "2009-12-31", admissionNo: "" })]);
+  });
+  it("flags unreadable dates", () => { expect(parseText("Name,Date of birth\nA B,sometime")[0]).toMatchObject({ dob: "", dobBad: true }); });
 });

@@ -72,7 +72,7 @@ You are the Owner. The rules know you by your Firebase user ID, so we do this in
 1. Open https://termbook.github.io/app/#/register (after the first deployment, Part 8). Create an account with your email and a strong password. Open the verification email and click the link.
 2. Come back to the app and press **I have verified my email**. You will see the "Who are you?" screen. Do not choose anything yet.
 3. In Firebase open **Authentication > Users**. Find your email and click the copy icon next to **User UID**.
-4. In GitHub open `firestore.rules`, click the **pencil icon**, and replace `REPLACE_WITH_OWNER_UID` (keep the quotes) with your UID. Click **Commit changes**.
+4. In GitHub open `firestore.rules` and find line 8, `function ownerUid()`. If it shows `REPLACE_WITH_OWNER_UID`, click the **pencil icon**, replace that text (keep the quotes) with your UID and click **Commit changes**. If it already shows your UID, check that it matches the one you copied.
 5. Copy the whole updated file again (Part 5, step 1) and paste it over the rules in Firebase, then click **Publish**.
 6. Reload the app. You should land on the **Schools** page for the Owner.
 

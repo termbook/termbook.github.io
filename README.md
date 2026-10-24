@@ -23,7 +23,7 @@ Termbook gives each school a daily AM/PM attendance register and per-subject sco
 - Score sheets with continuous assessment, exam, bonus marks, grades, positions, annual totals and Excel export.
 - Combined report cards per student, published to parents only when the school releases the term.
 - School setup: classes, arms, subjects, session and term, score weights and grade boundaries.
-- Student management for admins: full list, promote, move, tag as no longer in school, soft-delete and restore, bulk import.
+- Student management for admins: full list, promote, move, tag as no longer in school, soft-delete and restore, and bulk import from a downloadable CSV or Excel template.
 - Teacher registration with admin approval and role assignment.
 - Parent access by admission number and a revocable code.
 - Platform owner tools: school verification, audit log, national holidays and backups.

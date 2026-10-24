@@ -10,7 +10,7 @@
 Open **Attendance**. Use the arrows or type a date (DD/MM/YYYY). Switch AM and PM on for students who are present, or use **All AM**, **All PM** and **Clear day**. It saves by itself and works without internet; changes sync later. **Weekly** and **Term** show percentages and who is **At risk**. Both can be exported as CSV.
 
 ## Students
-Class teachers can add students to their own class and arm. They show as **Pending** until the admin confirms. The app warns about likely duplicates.
+Class teachers can add students to their own class and arm, one at a time or from a filled template (**Students > Download template**, then **Paste or import list**). They show as **Pending** until the admin confirms. The app warns about likely duplicates.
 
 ## Scores (subject teachers)
 1. Open **Scores** and choose a class and subject at the top.
