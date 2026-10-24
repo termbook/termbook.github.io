@@ -43,9 +43,16 @@ export function rolePicker(structure, init = {}) {
     const d = h("details", { class: "subj", "data-name": sub.toLowerCase(), open: [...pairs].some((p) => p.startsWith(sub + "@@")) }, h("summary", {}, sub, " ", count), h("div", {}, rows));
     return d;
   });
+  // Pairs that were saved earlier but are not offered by the school's current lists (for example Basic Science in SS2).
+  // They are shown ticked so they can be unticked; before this, they stayed hidden and could not be removed.
+  const offered = new Set(subjects.flatMap((sub) => classesForSubject(structure, sub).flatMap((c) => c.arms.map((a) => `${sub}@@${classKey(c.name, a)}`))));
+  const orphans = [...pairs].filter((p) => !offered.has(p));
+  const orphanBox = orphans.length ? h("fieldset", { class: "fs fs-warn" }, h("legend", {}, "Not offered in that class"),
+    h("p", { class: "hint" }, "These were selected earlier, but the school does not teach the subject in that class. Untick any that are wrong."),
+    orphans.map((p) => { const [sub, k] = p.split("@@"); return check(`${sub}, ${classLabel(k)}`, true, (e) => { e.target.checked ? pairs.add(p) : pairs.delete(p); }).el; })) : null;
   const q = h("input", { type: "search", placeholder: "Find a subject", "aria-label": "Find a subject", oninput: (e) => { const v = e.target.value.toLowerCase(); items.forEach((d) => (d.hidden = v && !d.dataset.name.includes(v))); } });
   const el = h("div", {}, field("Class teacher for", ctSel, "Takes the daily attendance register for this class and arm. Leave as it is if you are not a class teacher."),
-    h("fieldset", { class: "fs" }, h("legend", {}, "Subjects you teach"), h("p", { class: "hint" }, "Open a subject and tick only the classes where you teach it. JSS and SS subjects are listed separately."), q, h("div", { class: "subj-list" }, items)));
+    h("fieldset", { class: "fs" }, h("legend", {}, "Subjects you teach"), h("p", { class: "hint" }, "Open a subject and tick only the classes where you teach it. JSS and SS subjects are listed separately."), orphanBox, q, h("div", { class: "subj-list" }, items)));
   const get = () => {
     const [c, a] = ctSel.value ? ctSel.value.split("|") : [];
     const assignments = [...pairs].map((p) => { const [subject, k] = p.split("@@"); const { cls, arm } = splitKey(k); return { subject, class: cls, arm }; });
