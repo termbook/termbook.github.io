@@ -11,24 +11,36 @@ let unsub = null;
 
 export function studentsView(host) {
   const isAdmin = roleOf() === "owner" || roleOf() === "admin";
-  const structure = state.school.structure; const ui = { q: "", cls: "", status: "active", deleted: false, page: 0, sel: new Set() };
+  const structure = state.school.structure; const ui = { q: "", cls: "", arm: "", status: "active", deleted: false, page: 0, sel: new Set() };
   let all = null;
-  const body = h("div", {}); mount(host, h("h1", {}, "Students"), body, h("div", {}, skeleton(5)));
+  const body = h("div", {}); mount(host, h("h1", {}, "Students"), body);
   const teacherKeys = new Set(state.profile?.classKeys || []);
   const canAdd = isAdmin || Boolean(state.profile?.classTeacherKey);
   const addKeys = isAdmin ? null : state.profile?.classTeacherKey;
 
+  // Filter controls are built once, so typing in the search box is never interrupted by a redraw.
+  const search = h("input", { type: "search", placeholder: "Search by name or admission number", "aria-label": "Search students", value: ui.q, oninput: (e) => { ui.q = e.target.value; ui.page = 0; clearTimeout(search.t); search.t = setTimeout(drawList, 150); } });
+  const clsSel = select([["", "All classes"], ...structure.classes.map((c) => [c.name, c.name])], ui.cls, { "aria-label": "Class", onchange: (e) => { ui.cls = e.target.value; ui.arm = ""; ui.page = 0; fillArms(); drawList(); } });
+  const armSel = select([["", "All arms"]], "", { "aria-label": "Arm or section", onchange: (e) => { ui.arm = e.target.value; ui.page = 0; drawList(); } });
+  const fillArms = () => { const arms = ui.cls ? structure.classes.find((c) => c.name === ui.cls)?.arms || [] : [...new Set(structure.classes.flatMap((c) => c.arms))]; armSel.replaceChildren(...[["", "All arms"], ...arms.map((a) => [a, a])].map(([v2, l]) => h("option", { value: v2, selected: v2 === ui.arm }, l))); };
+  const statusSel = select([["active", "Active"]], ui.status, { "aria-label": "Status", onchange: (e) => { ui.status = e.target.value; ui.page = 0; drawList(); } });
+  const delChk = h("input", { type: "checkbox", onchange: (e) => { ui.deleted = e.target.checked; ui.sel.clear(); drawList(); } });
+  const listHost = h("div", {}); fillArms();
+  mount(body, h("div", { class: "toolbar" }, canAdd ? h("button", { class: "btn btn-primary", type: "button", onclick: () => editDialog(null) }, "Add student") : null,
+      canAdd ? h("button", { class: "btn", type: "button", onclick: bulkAddDialog }, "Paste or import list") : null,
+      canAdd ? h("button", { class: "btn", type: "button", onclick: () => downloadCsv("students-template.csv", [TEMPLATE_HEADERS]) }, "Download template") : null,
+      h("button", { class: "btn", type: "button", onclick: () => exportCsv(currentRows()) }, "Export CSV")),
+    h("div", { class: "filters" }, search, clsSel, armSel, statusSel, isAdmin ? h("label", { class: "chk" }, delChk, "Show removed") : null), listHost);
+  const currentRows = () => filterStudents(all || [], { q: ui.q, cls: ui.cls, arm: ui.arm, status: ui.status, showDeleted: ui.deleted }).sort((x, y) => x.name.localeCompare(y.name));
   function draw() {
-    const pendingCount = all.filter((s) => !s.deleted && s.status === "pending").length;
-    if (!ui.init) { ui.init = true; if (isAdmin && pendingCount) ui.status = "pending"; }
-    const rows = filterStudents(all, { q: ui.q, cls: ui.cls, status: ui.status, showDeleted: ui.deleted }).sort((a, b) => a.name.localeCompare(b.name));
-    const pages = Math.max(1, Math.ceil(rows.length / PAGE)); ui.page = Math.min(ui.page, pages - 1);
+    const counts = { active: 0, pending: 0, left: 0, graduated: 0 }; all.filter((s) => !s.deleted).forEach((s) => (counts[s.status] = (counts[s.status] || 0) + 1));
+    statusSel.replaceChildren(...[["active", `Active (${counts.active})`], ["pending", `Pending (${counts.pending})`], ["left", `No longer in school (${counts.left})`], ["graduated", `Graduated (${counts.graduated})`], ["all", "All statuses"]].map(([v2, l]) => h("option", { value: v2, selected: v2 === ui.status }, l)));
+    drawList();
+  }
+  function drawList() {
+    const rows = currentRows(); const pages = Math.max(1, Math.ceil(rows.length / PAGE)); ui.page = Math.min(ui.page, pages - 1);
     const view = rows.slice(ui.page * PAGE, ui.page * PAGE + PAGE);
-    const counts = { active: 0, pending: 0, left: 0, graduated: 0 }; all.filter((s) => !s.deleted).forEach((s) => counts[s.status] = (counts[s.status] || 0) + 1);
     const selected = [...ui.sel].filter((id) => all.some((s) => s.id === id));
-    const search = h("input", { type: "search", placeholder: "Search by name or admission number", "aria-label": "Search students", value: ui.q, oninput: (e) => { ui.q = e.target.value; ui.page = 0; clearTimeout(draw.t); draw.t = setTimeout(draw, 200); } });
-    const classOpts = [["", "All classes"], ...structure.classes.map((c) => [c.name, c.name])];
-    const statusOpts = [["active", `Active (${counts.active})`], ["pending", `Pending (${counts.pending})`], ["left", `No longer in school (${counts.left})`], ["graduated", `Graduated (${counts.graduated})`], ["all", "All statuses"]];
     const bar = isAdmin ? h("div", { class: "bulk", role: "toolbar", "aria-label": "Actions for selected students" },
       h("strong", {}, `${selected.length} selected`),
       ui.deleted ? h("button", { class: "btn btn-sm", disabled: !selected.length, onclick: () => act("restore", selected) }, "Restore") : [
@@ -39,26 +51,16 @@ export function studentsView(host) {
         ui.status === "pending" ? h("button", { class: "btn btn-sm btn-primary", disabled: !selected.length, onclick: () => act("approve", selected) }, "Approve") : null,
         h("button", { class: "btn btn-sm btn-danger-quiet", disabled: !selected.length, onclick: () => act("remove", selected) }, "Remove")]) : null;
     const table = rows.length ? h("div", { class: "table-wrap" }, h("table", {},
-      h("thead", {}, h("tr", {}, isAdmin ? h("th", { scope: "col" }, h("input", { type: "checkbox", "aria-label": "Select all on this page", checked: view.length > 0 && view.every((s) => ui.sel.has(s.id)), onchange: (e) => { view.forEach((s) => e.target.checked ? ui.sel.add(s.id) : ui.sel.delete(s.id)); draw(); } })) : null, h("th", { scope: "col" }, "Name"), h("th", { scope: "col" }, "Class"), h("th", { scope: "col" }, "Admission no."), h("th", { scope: "col" }, "Status"), h("th", { scope: "col" }, ""))),
+      h("thead", {}, h("tr", {}, isAdmin ? h("th", { scope: "col" }, h("input", { type: "checkbox", "aria-label": "Select all on this page", checked: view.length > 0 && view.every((s) => ui.sel.has(s.id)), onchange: (e) => { view.forEach((s) => (e.target.checked ? ui.sel.add(s.id) : ui.sel.delete(s.id))); drawList(); } })) : null, h("th", { scope: "col" }, "Name"), h("th", { scope: "col" }, "Class"), h("th", { scope: "col" }, "Admission no."), h("th", { scope: "col" }, "Status"), h("th", { scope: "col" }, ""))),
       h("tbody", {}, view.map((s) => h("tr", { class: s.deleted ? "deleted" : "" },
-        isAdmin ? h("td", {}, h("input", { type: "checkbox", "aria-label": `Select ${s.name}`, checked: ui.sel.has(s.id), onchange: (e) => { e.target.checked ? ui.sel.add(s.id) : ui.sel.delete(s.id); draw(); } })) : null,
+        isAdmin ? h("td", {}, h("input", { type: "checkbox", "aria-label": `Select ${s.name}`, checked: ui.sel.has(s.id), onchange: (e) => { e.target.checked ? ui.sel.add(s.id) : ui.sel.delete(s.id); drawList(); } })) : null,
         h("td", {}, h("span", { class: "avatar", "aria-hidden": "true" }, initials(s.name)), s.name, s.repeater ? h("span", { class: "tag tag-warn" }, "Repeater") : null),
         h("td", {}, classLabel(s.classKey || "")), h("td", {}, s.admissionNo),
         h("td", {}, h("span", { class: `tag tag-${s.deleted ? "err" : s.status}` }, s.deleted ? "Removed" : STATUS[s.status] || s.status), s.status === "left" && s.leftReason ? h("div", { class: "hint" }, s.leftReason + (s.leftOn ? ` (${showDate(s.leftOn)})` : "")) : null),
         h("td", {}, h("button", { class: "btn btn-sm", type: "button", onclick: () => editDialog(s) }, "Open")))))))
       : empty("No students match", ui.status === "active" && !all.length ? "Add students one by one or paste a list to get started." : "Try a different search or filter.");
-    const pager = pages > 1 ? h("div", { class: "pager" }, h("button", { class: "btn btn-sm", disabled: ui.page === 0, onclick: () => { ui.page--; draw(); } }, "Previous"), h("span", {}, `Page ${ui.page + 1} of ${pages} (${rows.length} students)`), h("button", { class: "btn btn-sm", disabled: ui.page >= pages - 1, onclick: () => { ui.page++; draw(); } }, "Next")) : h("p", { class: "muted" }, `${rows.length} student${rows.length === 1 ? "" : "s"}`);
-    mount(body,
-      h("div", { class: "toolbar" }, canAdd ? h("button", { class: "btn btn-primary", type: "button", onclick: () => editDialog(null) }, "Add student") : null,
-        canAdd ? h("button", { class: "btn", type: "button", onclick: bulkAddDialog }, "Paste or import list") : null,
-        canAdd ? h("button", { class: "btn", type: "button", onclick: () => downloadCsv("students-template.csv", [TEMPLATE_HEADERS]) }, "Download template") : null,
-        h("button", { class: "btn", type: "button", onclick: () => exportCsv(rows) }, "Export CSV")),
-      h("div", { class: "filters" }, search, select(classOpts, ui.cls, { "aria-label": "Class", onchange: (e) => { ui.cls = e.target.value; ui.page = 0; draw(); } }),
-        select(statusOpts, ui.status, { "aria-label": "Status", onchange: (e) => { ui.status = e.target.value; ui.page = 0; draw(); } }),
-        isAdmin ? h("label", { class: "chk" }, h("input", { type: "checkbox", checked: ui.deleted, onchange: (e) => { ui.deleted = e.target.checked; ui.sel.clear(); draw(); } }), "Show removed") : null),
-      isAdmin && pendingCount && ui.status !== "pending" ? h("p", { class: "banner banner-warn" }, `${pendingCount} student${pendingCount === 1 ? " is" : "s are"} waiting for your confirmation. `, h("button", { class: "linkbtn", type: "button", onclick: () => { ui.status = "pending"; ui.page = 0; draw(); } }, "Show them")) : null,
-      isAdmin && ui.status === "pending" && pendingCount ? h("p", { class: "banner banner-info" }, "Tick the students (or the box at the top of the list), then tap Approve. Use Remove for any that should not be here.") : null,
-      bar, table, pager);
+    const pager = pages > 1 ? h("div", { class: "pager" }, h("button", { class: "btn btn-sm", disabled: ui.page === 0, onclick: () => { ui.page--; drawList(); } }, "Previous"), h("span", {}, `Page ${ui.page + 1} of ${pages} (${rows.length} students)`), h("button", { class: "btn btn-sm", disabled: ui.page >= pages - 1, onclick: () => { ui.page++; drawList(); } }, "Next")) : h("p", { class: "muted" }, `${rows.length} student${rows.length === 1 ? "" : "s"}`);
+    mount(listHost, bar, table, pager);
   }
 
   function exportCsv(rows) { downloadCsv("students.csv", [["Name", "Gender", "Class", "Arm", "Admission no.", "Status", "Repeater", "Date of birth"], ...rows.map((s) => [s.name, s.gender, s.class, s.arm, s.admissionNo, STATUS[s.status] || s.status, s.repeater ? "Yes" : "", showDate(s.dob)])]); }
@@ -120,7 +122,11 @@ export function studentsView(host) {
           const dups = findDuplicates(all, { ...rec, admissionNo: admNo, classKey: key });
           if (dups.length && !await confirmDialog({ title: "Possible duplicate", body: `${dups[0].name} (${classLabel(dups[0].classKey)}, ${dups[0].admissionNo}) looks like this student. Add anyway?`, confirmLabel: "Add anyway" })) return;
           await addStudent({ ...rec, admissionNo: admNo, status: isAdmin ? "active" : "pending" }, priv); toast(isAdmin ? "Student added" : "Student added. The admin will confirm.");
-        } else { if (statusSel) rec.status = statusSel.value; await updateStudent(s.id, rec, priv); toast("Saved"); }
+        } else {
+          if (statusSel) rec.status = statusSel.value;
+          if (rec.name !== s.name) { const dups = findDuplicates(all, { ...rec, id: s.id, admissionNo: "", classKey: s.classKey }); if (dups.length && !await confirmDialog({ title: "Same name in this class", body: `${dups[0].name} is already in ${classLabel(dups[0].classKey)}. Save the new name anyway?`, confirmLabel: "Save anyway" })) return; }
+          await updateStudent(s.id, rec, priv, s); toast("Saved");
+        }
         close("ok");
       } catch (err) { fail(friendlyAuthError(err)); }
     } }, field("Full name (surname first)", name), field("Gender", gender), field("Admission number", adm, isNew ? "Cannot be changed later." : null), field(addKeys ? "Class (yours)" : "Class and arm", cp),
@@ -169,6 +175,7 @@ export function studentsView(host) {
       h("div", { class: "dlg-actions" }, h("button", { class: "btn", type: "button", onclick: () => close("no") }, "Cancel"), h("button", { class: "btn btn-primary", type: "submit" }, "Review and add"))));
   }
 
-  unsub?.(); unsub = watchStudents((list, err) => { if (err) return mount(body, empty("Cannot load students", friendlyAuthError(err))); state.students = list; all = list; draw(); });
+  mount(listHost, skeleton(5));
+  unsub?.(); unsub = watchStudents((list, err) => { if (err) return mount(listHost, empty("Cannot load students", friendlyAuthError(err))); state.students = list; all = list; draw(); });
 }
 export function stopStudents() { unsub?.(); unsub = null; }

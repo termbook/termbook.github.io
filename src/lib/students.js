@@ -39,11 +39,12 @@ export function makeAccessCode(len = 10) {
 /** Which students show on registers and score sheets: active only (not left, graduated, deleted or pending). */
 export const isEnrolled = (s) => !s.deleted && s.status === "active";
 
-export function filterStudents(list, { q = "", cls = "", status = "active", showDeleted = false } = {}) {
+export function filterStudents(list, { q = "", cls = "", arm = "", status = "active", showDeleted = false } = {}) {
   const needle = q.trim().toLowerCase();
   return list.filter((s) => (showDeleted ? s.deleted : !s.deleted)
     && (status === "all" || s.status === status)
     && (!cls || s.class === cls)
+    && (!arm || s.arm === arm)
     && (!needle || s.name.toLowerCase().includes(needle) || String(s.admissionNo || "").toLowerCase().includes(needle)));
 }
 

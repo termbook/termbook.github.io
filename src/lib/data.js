@@ -115,12 +115,14 @@ export async function addStudents(list) {
   }
   await audit("student_bulk_add", sp("students"), { count: list.length });
 }
-export async function updateStudent(id, patch, priv) {
+export async function updateStudent(id, patch, priv, before = {}) {
   const b = writeBatch(db);
-  const full = { ...patch }; if (patch.class && patch.arm) full.classKey = classKey(patch.class, patch.arm);
+  const full = { ...patch, updatedAt: serverTimestamp() }; if (patch.class && patch.arm) full.classKey = classKey(patch.class, patch.arm);
   b.update(ref(sp(`students/${id}`)), full);
   if (priv) b.set(ref(sp(`students/${id}/private/info`)), priv, { merge: true });
   await b.commit();
+  const changed = Object.keys(patch).filter((k) => before[k] !== undefined && before[k] !== patch[k]);
+  await audit("student_edit", id, { fields: changed, ...(changed.includes("name") ? { nameFrom: before.name, nameTo: patch.name } : {}) });
 }
 /** Bulk change for the admin/owner: promote, move, mark as left, graduate, reactivate, remove (soft-delete) or restore. */
 export async function bulkStudentAction(ids, action, payload = {}, list = []) {

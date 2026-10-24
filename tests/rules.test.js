@@ -109,6 +109,12 @@ describe("student management", () => {
     other.set(doc(db, "schools/s1/students/new8/private/info"), { address: "x" });
     await assertFails(other.commit());
   });
+  it("a class teacher can correct the name of a student in their own class, but not in another class", async () => {
+    const db = as("ctch");
+    await assertSucceeds(updateDoc(doc(db, "schools/s1/students/st2"), { name: "B CORRECTED" }));
+    await assertFails(updateDoc(doc(db, "schools/s1/students/st1"), { name: "NOT MY CLASS" }));
+    await assertFails(updateDoc(doc(as("subj"), "schools/s1/students/st1"), { name: "SUBJECT TEACHER" }));
+  });
   it("a subject teacher can list only the classes they teach", async () => {
     const db = as("subj");
     await assertSucceeds(getDocs(query(collection(db, "schools/s1/students"), where("classKey", "==", "SS2|A"))));

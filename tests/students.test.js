@@ -28,6 +28,12 @@ describe("students", () => {
     expect(filterStudents(l, { showDeleted: true, status: "all" })).toHaveLength(1);
     expect(filterStudents(l, { q: "c d", status: "all" })).toHaveLength(1);
   });
+  it("filters by arm or section", () => {
+    const l = [{ name: "A", class: "SS2", arm: "Science", status: "active" }, { name: "B", class: "SS2", arm: "Arts", status: "active" }, { name: "C", class: "JSS1", arm: "A", status: "active" }];
+    expect(filterStudents(l, { arm: "Science" }).map((x) => x.name)).toEqual(["A"]);
+    expect(filterStudents(l, { cls: "SS2", arm: "Arts" }).map((x) => x.name)).toEqual(["B"]);
+    expect(filterStudents(l, { cls: "JSS1", arm: "Arts" })).toHaveLength(0);
+  });
   it("parses pasted lists and CSV", () => {
     expect(parseStudentRows("ade bola,F,2026/9\n2. tunde ola, m, r")).toEqual([
       { name: "ADE BOLA", gender: "F", admissionNo: "2026/9", repeater: false }, { name: "TUNDE OLA", gender: "M", admissionNo: "", repeater: true }]);
