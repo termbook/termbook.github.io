@@ -115,6 +115,20 @@ describe("student management", () => {
     await assertFails(updateDoc(doc(db, "schools/s1/students/st1"), { name: "NOT MY CLASS" }));
     await assertFails(updateDoc(doc(as("subj"), "schools/s1/students/st1"), { name: "SUBJECT TEACHER" }));
   });
+  it("class teachers and admins can correct admission numbers in their class; a parent can look up one number but not list", async () => {
+    const ct = as("ctch");
+    await assertSucceeds(updateDoc(doc(ct, "schools/s1/students/st2"), { admissionNo: "B9" }));
+    await assertSucceeds(setDoc(doc(ct, "schools/s1/admissionIndex/B9"), { studentId: "st2" }));
+    await assertFails(setDoc(doc(ct, "schools/s1/admissionIndex/B9"), { studentId: "st1" })); // cannot overwrite
+    await assertFails(setDoc(doc(ct, "schools/s1/admissionIndex/st1"), { studentId: "st2" })); // that number already belongs to a student
+    await assertFails(updateDoc(doc(ct, "schools/s1/students/st1"), { admissionNo: "Z1" })); // not their class
+    await assertFails(setDoc(doc(ct, "schools/s1/admissionIndex/Z1"), { studentId: "st1" }));
+    await assertSucceeds(setDoc(doc(as("adm1"), "schools/s1/admissionIndex/Z2"), { studentId: "st1" }));
+    await assertSucceeds(getDoc(doc(as("parent1"), "schools/s1/admissionIndex/B9")));
+    await assertFails(getDocs(collection(as("parent1"), "schools/s1/admissionIndex")));
+    await assertFails(setDoc(doc(as("parent1"), "schools/s1/admissionIndex/X1"), { studentId: "st1" }));
+    await assertFails(getDoc(doc(as("other"), "schools/s1/admissionIndex/B9")));
+  });
   it("a subject teacher can list only the classes they teach", async () => {
     const db = as("subj");
     await assertSucceeds(getDocs(query(collection(db, "schools/s1/students"), where("classKey", "==", "SS2|A"))));

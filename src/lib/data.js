@@ -118,11 +118,23 @@ export async function addStudents(list) {
 export async function updateStudent(id, patch, priv, before = {}) {
   const b = writeBatch(db);
   const full = { ...patch, updatedAt: serverTimestamp() }; if (patch.class && patch.arm) full.classKey = classKey(patch.class, patch.arm);
+  const admChanged = patch.admissionNo !== undefined && patch.admissionNo !== before.admissionNo;
+  if (admChanged) {
+    // The record id stays the same so attendance, scores and parent links keep working. An index maps the new number to it.
+    const newKey = studentIdFor(patch.admissionNo); const isAdminRole = state.isOwner || state.profile?.role === "admin";
+    if (newKey !== id) {
+      const ix = await getDoc(ref(sp(`admissionIndex/${newKey}`)));
+      if (ix.exists() && ix.data().studentId !== id) throw new Error("That admission number is already in use.");
+      if (isAdminRole && (await getDoc(ref(sp(`students/${newKey}`)))).exists()) throw new Error("That admission number is already in use.");
+      if (!ix.exists()) b.set(ref(sp(`admissionIndex/${newKey}`)), { studentId: id });
+    }
+    const oldKey = studentIdFor(before.admissionNo); if (oldKey !== id) b.delete(ref(sp(`admissionIndex/${oldKey}`)));
+  }
   b.update(ref(sp(`students/${id}`)), full);
   if (priv) b.set(ref(sp(`students/${id}/private/info`)), priv, { merge: true });
   await b.commit();
   const changed = Object.keys(patch).filter((k) => before[k] !== undefined && before[k] !== patch[k]);
-  await audit("student_edit", id, { fields: changed, ...(changed.includes("name") ? { nameFrom: before.name, nameTo: patch.name } : {}) });
+  await audit("student_edit", id, { fields: changed, ...(changed.includes("name") ? { nameFrom: before.name, nameTo: patch.name } : {}), ...(admChanged ? { admissionFrom: before.admissionNo, admissionTo: patch.admissionNo } : {}) });
 }
 /** Bulk change for the admin/owner: promote, move, mark as left, graduate, reactivate, remove (soft-delete) or restore. */
 export async function bulkStudentAction(ids, action, payload = {}, list = []) {
@@ -170,7 +182,9 @@ export async function revokeAccess(student) {
 export async function loadAccessCode(studentId) { const s = await getDoc(ref(sp(`accessCodes/${studentId}`))); return s.exists() ? s.data() : null; }
 /** Parent links a child. The rules compare the code on the server; the code is never readable by the parent. */
 export async function linkChild({ schoolId, admissionNo, code, childName }) {
-  const uid = auth.currentUser.uid; const studentId = studentIdFor(admissionNo);
+  const uid = auth.currentUser.uid; let studentId = studentIdFor(admissionNo);
+  // If the school corrected this admission number, the index points to the student's real record id.
+  try { const ix = await getDoc(doc(db, `schools/${schoolId}/admissionIndex/${studentId}`)); if (ix.exists()) studentId = ix.data().studentId; } catch { /* no index: the number was never changed */ }
   await setDoc(doc(db, `schools/${schoolId}/links/${uid}_${studentId}`), { uid, studentId, admissionNo, code, createdAt: serverTimestamp() });
   const me = await getDoc(ref(`users/${uid}`)); const links = (me.data()?.links || []).filter((l) => !(l.schoolId === schoolId && l.studentId === studentId));
   links.push({ schoolId, studentId, admissionNo }); await updateDoc(ref(`users/${uid}`), { links });

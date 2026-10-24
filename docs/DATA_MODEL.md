@@ -11,6 +11,7 @@ Every school's data lives under `schools/{schoolId}/...`. Access is decided by `
 | `schools/{sid}` | details, structure, scoring, current session and term, status | school staff, owner | admin (not status), owner |
 | `schools/{sid}/students/{admissionKey}` | name, gender, class, arm, `classKey`, status, repeater, soft-delete flag | admin, owner, teachers of that class, linked parent | admin, owner, class teacher (pending only) |
 | `.../students/{id}/private/info` | address, parent phone, religion | admin, owner, class teacher | same |
+| `.../admissionIndex/{admissionKey}` | maps a corrected admission number to the student's record id | admin, owner, staff; a parent can look up one number | admin, owner; class teacher (create or delete, own class) |
 | `.../accessCodes/{studentId}` | parent code, active flag | admin, owner | admin, owner |
 | `.../links/{uid_studentId}` | parent link (code checked by rules) | admin, owner, that parent | parent (with correct code), admin |
 | `.../attendance/{classKey_date}` | marks per student | class teacher, admin, owner | same |
@@ -20,4 +21,4 @@ Every school's data lives under `schools/{schoolId}/...`. Access is decided by `
 | `.../reports/{term_studentId}` | compiled report card and attendance summary | admin, owner, class teacher, linked parent once published | admin, owner |
 | `audit/{id}` | who, what, when | admin of that school, owner | any member (create only) |
 
-`classKey` is `CLASS|ARM`, for example `SS2|A`. A student's document id is derived from the admission number, so admission numbers are unique.
+`classKey` is `CLASS|ARM`, for example `SS2|A`. A student's document id is derived from the admission number when the student is created and never changes. If the admin later corrects the admission number, the `admissionIndex` maps the new number to that id.

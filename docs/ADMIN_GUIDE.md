@@ -20,7 +20,7 @@ Open **Students** to see everyone in your school.
   - **No longer in school** tags students who left (withdrawn, transferred, not returning). They disappear from registers and score sheets but stay in the history. **Back in school** reverses it.
   - **Approve** confirms students added by class teachers (shown as Pending).
   - **Remove** hides a student (soft delete). Tick **Show removed** and **Restore** to bring one back.
-- Open a student to edit details, or create a **parent access code**. Admission numbers cannot be changed after saving.
+- Open a student to edit details, or create a **parent access code**. The school admin can correct an admission number (open the student and edit it). The student's attendance, scores and parent access are kept, so tell the parent the new number. Class teachers can also correct admission numbers for students in their own class.
 - The religion field is optional and off by default.
 
 ## Starting a new term or session

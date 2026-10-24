@@ -92,7 +92,8 @@ export function studentsView(host) {
   function editDialog(s) {
     const isNew = !s; const keyDefault = ui.cls ? classKey(ui.cls, structure.classes.find((c) => c.name === ui.cls)?.arms[0]) : "";
     const name = input({ id: "n", value: s?.name || "" }); const gender = select([["M", "Male"], ["F", "Female"]], s?.gender || "M");
-    const adm = input({ id: "a", value: s?.admissionNo || "", disabled: !isNew, placeholder: isNew ? "Leave blank to generate one" : "" });
+    const mine = isNew || isAdmin || s.classKey === addKeys; // class teachers edit only their own class
+    const adm = input({ id: "a", value: s?.admissionNo || "", disabled: !mine, placeholder: isNew ? "Leave blank to generate one" : "" });
     const cp = addKeys ? h("input", { value: classLabel(addKeys), disabled: true, id: "cp" }) : classPicker(structure, s?.classKey || keyDefault);
     const rep = h("input", { type: "checkbox", checked: Boolean(s?.repeater) }); const dob = input({ id: "d", placeholder: "DD/MM/YYYY", value: showDate(s?.dob) });
     const par = input({ id: "p", value: s?.parentName || "" }); const addr = input({ id: "ad" }); const ph = input({ id: "ph", type: "tel" });
@@ -109,12 +110,14 @@ export function studentsView(host) {
           c?.active ? h("button", { class: "btn btn-sm btn-danger-quiet", type: "button", onclick: async () => { if (await confirmDialog({ title: "Revoke parent access?", body: "The code stops working and any linked parent loses access.", confirmLabel: "Revoke", danger: true })) { await revokeAccess(s); renderCode(); } } }, "Revoke access") : null));
     }
     const save = h("button", { class: "btn btn-primary", type: "submit" }, isNew ? "Add student" : "Save changes");
+    if (!mine) { [name, gender, rep, dob, par, addr, ph, relOn, rel].forEach((x) => (x.disabled = true)); save.disabled = true; }
     formDialog(isNew ? "Add student" : s.name, (close) => h("form", { novalidate: true, onsubmit: async (e) => {
       e.preventDefault(); out.hidden = true; const nm = normName(name.value); const key = addKeys || cp.value;
       const fail = (t) => { out.textContent = t; out.className = "form-msg error"; out.hidden = false; };
       if (!nm) return fail("Enter the student's name (surname first)."); if (!key) return fail("Choose a class and arm.");
       if (dob.value && !parseShown(dob.value)) return fail("Date of birth must be DD/MM/YYYY."); if (ph.value && !validPhone(ph.value)) return fail("Enter a valid parent phone number.");
       const [c, a] = key.split("|"); const taken = new Set(all.map((x) => x.admissionNo)); const admNo = adm.value.trim() || s?.admissionNo || makeAdmissionNo(taken);
+      if (!isNew && mine) { const nn = adm.value.trim(); if (!nn) return fail("The admission number cannot be empty."); if (nn !== s.admissionNo && all.some((x) => x.id !== s.id && x.admissionNo === nn)) return fail("Another student already has that admission number."); }
       const rec = { name: nm, gender: gender.value, class: c, arm: a, repeater: rep.checked, dob: parseShown(dob.value), parentName: par.value.trim() };
       const priv = { address: addr.value.trim(), phone: ph.value.replace(/[\s-]/g, ""), religion: relOn.checked ? rel.value : "" };
       try {
@@ -124,12 +127,13 @@ export function studentsView(host) {
           await addStudent({ ...rec, admissionNo: admNo, status: isAdmin ? "active" : "pending" }, priv); toast(isAdmin ? "Student added" : "Student added. The admin will confirm.");
         } else {
           if (statusSel) rec.status = statusSel.value;
+          if (mine) rec.admissionNo = adm.value.trim();
           if (rec.name !== s.name) { const dups = findDuplicates(all, { ...rec, id: s.id, admissionNo: "", classKey: s.classKey }); if (dups.length && !await confirmDialog({ title: "Same name in this class", body: `${dups[0].name} is already in ${classLabel(dups[0].classKey)}. Save the new name anyway?`, confirmLabel: "Save anyway" })) return; }
           await updateStudent(s.id, rec, priv, s); toast("Saved");
         }
         close("ok");
       } catch (err) { fail(friendlyAuthError(err)); }
-    } }, field("Full name (surname first)", name), field("Gender", gender), field("Admission number", adm, isNew ? "Cannot be changed later." : null), field(addKeys ? "Class (yours)" : "Class and arm", cp),
+    } }, field("Full name (surname first)", name), field("Gender", gender), field("Admission number", adm, isNew ? "You can correct it later if it is wrong." : mine ? "Correcting it keeps the student's attendance, scores and parent access. Tell the parent the new number." : "You can view this student, but only their class teacher or the admin can edit."), field(addKeys ? "Class (yours)" : "Class and arm", cp),
       h("label", { class: "chk" }, rep, "Repeater"), statusSel ? field("Status", statusSel) : null, field("Date of birth (optional)", dob),
       h("div", { class: "field" }, h("label", { for: "p" }, "Parent or guardian"), par, h("button", { class: "btn btn-sm", type: "button", onclick: () => (par.value = autoParent(name.value)) }, "Auto-fill")),
       canPrivate ? [h("p", { class: "hint" }, "The next fields are visible only to the school admin and this class's teacher."), field("Address (optional)", addr), field("Parent phone (optional)", ph),

@@ -99,6 +99,20 @@ service cloud.firestore {
         }
       }
 
+      // Maps a corrected admission number to the student's record id. Created once, never overwritten by a class teacher.
+      // A new number is refused if it is already some student's original number (a record with that id exists) or already in the index.
+      // A parent can look up one number they know (get) but cannot list the school.
+      match /admissionIndex/{key} {
+        allow get: if isOwner() || isAdmin(sid) || isTeacher(sid) || (verified() && hasProfile() && meDoc().role == 'parent');
+        allow list: if isOwner() || isAdmin(sid);
+        allow create: if (isOwner() || isAdmin(sid)
+            || isClassTeacher(sid, get(/databases/$(db)/documents/schools/$(sid)/students/$(request.resource.data.studentId)).data.classKey))
+          && !exists(/databases/$(db)/documents/schools/$(sid)/students/$(key));
+        allow update: if isOwner() || isAdmin(sid);
+        allow delete: if isOwner() || isAdmin(sid)
+          || isClassTeacher(sid, get(/databases/$(db)/documents/schools/$(sid)/students/$(resource.data.studentId)).data.classKey);
+      }
+
       match /accessCodes/{studentId} {
         allow read, write: if isOwner() || isAdmin(sid);
       }
