@@ -91,8 +91,11 @@ service cloud.firestore {
         allow delete: if false; // students are soft-deleted (deleted: true), never hard-deleted
 
         match /private/{doc} {
-          allow read, write: if isOwner() || isAdmin(sid)
+          allow read: if isOwner() || isAdmin(sid)
             || isClassTeacher(sid, get(/databases/$(db)/documents/schools/$(sid)/students/$(id)).data.classKey);
+          // getAfter lets a class teacher write a new student and its private details in one batch.
+          allow write: if isOwner() || isAdmin(sid)
+            || isClassTeacher(sid, getAfter(/databases/$(db)/documents/schools/$(sid)/students/$(id)).data.classKey);
         }
       }
 

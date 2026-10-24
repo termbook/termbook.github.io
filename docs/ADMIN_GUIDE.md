@@ -4,11 +4,11 @@
 1. Open the site, click **Register**, create your account and verify your email.
 2. Choose **I am registering a school** and fill in the school and your details. Your name goes surname first. Dates are DD/MM/YYYY.
 3. Your school shows as **waiting for verification** until the platform owner approves it (unless the owner has switched verification off). You can set up while you wait.
-4. Open **Setup** and check your classes, arms, SS departments and subjects. **Do this before teachers register**, because teachers choose from these lists.
+4. Open **Setup** and check your classes, arms, SS departments and subjects. JSS and SS subjects are separate lists, so a teacher is only offered the subjects taught in each class. **Do this before teachers register**, because teachers choose from these lists.
 5. In **Setup > Session and term** enter the session (for example 2026/2027), the term, the term start date (a Monday), weeks and the at-risk percentage. In **Scoring** check the marks and grade boundaries before scoring starts.
 
 ## Teachers
-Open **Teachers**. New requests wait under "Waiting for approval". Click **Review**, adjust the class teacher role and the subjects and classes, then **Approve**. A teacher sees nothing until approved. You can **Suspend** or change roles at any time.
+Open **Teachers**. New requests wait under "Waiting for approval". Click **Review**, adjust the class teacher role and the exact subject and class ticks, then **Approve**. To fix a teacher who ticked the wrong classes, click **Edit** on their name, untick or tick the right ones and choose **Save roles**. A teacher sees nothing until approved. You can **Suspend** or change roles at any time.
 
 ## Students
 Open **Students** to see everyone in your school.

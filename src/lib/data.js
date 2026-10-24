@@ -3,6 +3,7 @@ import { db, auth } from "./firebase.js";
 import { state, effectiveSchoolId } from "./store.js";
 import { classKey } from "./students.js";
 import { DEFAULT_WEIGHTS, DEFAULT_GRADES } from "./scores.js";
+import { DEFAULT_SUBJECTS_BY_LEVEL, unionSubjects } from "./structure.js";
 import {
   doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, collection, getDocs, query, where, onSnapshot, writeBatch, serverTimestamp, orderBy, FieldPath, deleteField,
 } from "firebase/firestore";
@@ -14,7 +15,8 @@ export const ref = (path) => doc(db, path);
 export const DEFAULT_STRUCTURE = {
   classes: ["JSS1", "JSS2", "JSS3", "SS1", "SS2", "SS3"].map((name) => ({ name, arms: ["A", "B"] })),
   departments: ["Science", "Arts", "Commercial"],
-  subjects: ["English Language", "Mathematics", "Basic Science", "Basic Technology", "Social Studies", "Civic Education", "Computer Studies", "Agricultural Science", "Business Studies", "Christian Religious Studies", "Islamic Religious Studies", "Physical and Health Education", "Cultural and Creative Arts", "Yoruba", "Igbo", "Hausa", "French", "Biology", "Chemistry", "Physics", "Further Mathematics", "Economics", "Government", "Literature in English", "Geography", "Accounting", "Commerce"],
+  subjectsByLevel: DEFAULT_SUBJECTS_BY_LEVEL,
+  subjects: unionSubjects(DEFAULT_SUBJECTS_BY_LEVEL),
 };
 export const DEFAULT_SCORING = { weights: DEFAULT_WEIGHTS, grades: DEFAULT_GRADES };
 export const DEFAULT_SETTINGS = { atRisk: 75, weeks: 13 };

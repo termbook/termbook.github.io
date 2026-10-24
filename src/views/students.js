@@ -19,6 +19,8 @@ export function studentsView(host) {
   const addKeys = isAdmin ? null : state.profile?.classTeacherKey;
 
   function draw() {
+    const pendingCount = all.filter((s) => !s.deleted && s.status === "pending").length;
+    if (!ui.init) { ui.init = true; if (isAdmin && pendingCount) ui.status = "pending"; }
     const rows = filterStudents(all, { q: ui.q, cls: ui.cls, status: ui.status, showDeleted: ui.deleted }).sort((a, b) => a.name.localeCompare(b.name));
     const pages = Math.max(1, Math.ceil(rows.length / PAGE)); ui.page = Math.min(ui.page, pages - 1);
     const view = rows.slice(ui.page * PAGE, ui.page * PAGE + PAGE);
@@ -54,6 +56,8 @@ export function studentsView(host) {
       h("div", { class: "filters" }, search, select(classOpts, ui.cls, { "aria-label": "Class", onchange: (e) => { ui.cls = e.target.value; ui.page = 0; draw(); } }),
         select(statusOpts, ui.status, { "aria-label": "Status", onchange: (e) => { ui.status = e.target.value; ui.page = 0; draw(); } }),
         isAdmin ? h("label", { class: "chk" }, h("input", { type: "checkbox", checked: ui.deleted, onchange: (e) => { ui.deleted = e.target.checked; ui.sel.clear(); draw(); } }), "Show removed") : null),
+      isAdmin && pendingCount && ui.status !== "pending" ? h("p", { class: "banner banner-warn" }, `${pendingCount} student${pendingCount === 1 ? " is" : "s are"} waiting for your confirmation. `, h("button", { class: "linkbtn", type: "button", onclick: () => { ui.status = "pending"; ui.page = 0; draw(); } }, "Show them")) : null,
+      isAdmin && ui.status === "pending" && pendingCount ? h("p", { class: "banner banner-info" }, "Tick the students (or the box at the top of the list), then tap Approve. Use Remove for any that should not be here.") : null,
       bar, table, pager);
   }
 

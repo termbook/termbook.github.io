@@ -4,6 +4,7 @@ import { listTeachers, setTeacher, saveSchool, loadTerm, saveTerm, nationalHolid
 import { input, select, rolePicker, classLabel, friendlyAuthError } from "./common.js";
 import { showDate, parseShown } from "../lib/dates.js";
 import { promotionTarget } from "../lib/students.js";
+import { subjectsByLevel, unionSubjects } from "../lib/structure.js";
 import { DEFAULT_GRADES, DEFAULT_WEIGHTS } from "../lib/scores.js";
 
 export async function overviewView(host) {
@@ -50,11 +51,11 @@ export async function setupView(host) {
   const out = (el) => { el.className = "form-msg ok"; el.textContent = "Saved."; el.hidden = false; };
   // --- structure
   const classBoxes = s.structure.classes.map((c) => ({ name: c.name, arms: input({ value: c.arms.join(", "), "aria-label": `${c.name} arms` }) }));
-  const subj = h("textarea", { rows: 8, "aria-label": "Subjects" }, s.structure.subjects.join("\n")); const dept = input({ value: s.structure.departments.join(", ") });
+  const sbl = subjectsByLevel(s.structure); const subjJ = h("textarea", { rows: 8, "aria-label": "JSS subjects" }, sbl.JSS.join("\n")); const subjS = h("textarea", { rows: 8, "aria-label": "SS subjects" }, sbl.SS.join("\n")); const dept = input({ value: s.structure.departments.join(", ") });
   const stMsg = h("p", { hidden: true, role: "status" });
   const structureCard = h("section", { class: "card" }, h("h2", {}, "Classes, arms and subjects"), h("p", { class: "muted" }, "Edit these before teachers register, so they can pick from your school's own list. Separate arms with commas (A, B, C)."),
-    classBoxes.map((c) => field(c.name + " arms", c.arms)), field("SS departments (comma separated)", dept), field("Subjects (one per line)", subj), stMsg,
-    h("button", { class: "btn btn-primary", type: "button", onclick: async () => { const classes = classBoxes.map((c) => ({ name: c.name, arms: c.arms.value.split(",").map((x) => x.trim()).filter(Boolean) })); if (classes.some((c) => !c.arms.length)) { stMsg.className = "form-msg error"; stMsg.textContent = "Every class needs at least one arm."; stMsg.hidden = false; return; } try { await saveSchool({ structure: { classes, departments: dept.value.split(",").map((x) => x.trim()).filter(Boolean), subjects: [...new Set(lines(subj.value))] } }); out(stMsg); } catch (e) { stMsg.className = "form-msg error"; stMsg.textContent = friendlyAuthError(e); stMsg.hidden = false; } } }, "Save"));
+    classBoxes.map((c) => field(c.name + " arms", c.arms)), field("SS departments (comma separated)", dept), field("JSS subjects (JSS1 to JSS3), one per line", subjJ), field("SS subjects (SS1 to SS3), one per line", subjS, "A subject taught at both levels goes in both lists."), stMsg,
+    h("button", { class: "btn btn-primary", type: "button", onclick: async () => { const classes = classBoxes.map((c) => ({ name: c.name, arms: c.arms.value.split(",").map((x) => x.trim()).filter(Boolean) })); if (classes.some((c) => !c.arms.length)) { stMsg.className = "form-msg error"; stMsg.textContent = "Every class needs at least one arm."; stMsg.hidden = false; return; } try { await saveSchool({ structure: { classes, departments: dept.value.split(",").map((x) => x.trim()).filter(Boolean), subjectsByLevel: { JSS: [...new Set(lines(subjJ.value))], SS: [...new Set(lines(subjS.value))] }, subjects: unionSubjects({ JSS: lines(subjJ.value), SS: lines(subjS.value) }) } }); out(stMsg); } catch (e) { stMsg.className = "form-msg error"; stMsg.textContent = friendlyAuthError(e); stMsg.hidden = false; } } }, "Save"));
   // --- term
   const sess = input({ value: s.current.session }); const tn = select([["1", "1st term"], ["2", "2nd term"], ["3", "3rd term"]], String(s.current.term));
   const start = input({ placeholder: "DD/MM/YYYY (a Monday)", value: showDate(term.startDate) }); const weeks = input({ type: "number", value: term.weeks || s.settings.weeks, min: 1, max: 20 }); const risk = input({ type: "number", value: term.atRisk || s.settings.atRisk, min: 1, max: 100 });

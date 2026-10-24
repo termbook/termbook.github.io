@@ -3,7 +3,7 @@
 ## Joining your school
 1. Click **Register**, create an account and verify your email.
 2. Choose **I am a teacher joining my school**. Pick your state, local government and school.
-3. Choose your roles: class teacher for a class and arm, and/or the subjects and classes you teach.
+3. Choose your roles. Class teacher: pick your one class and arm. Subject teacher: open each subject you teach and tick only the classes (and arms) where you teach it. JSS and SS have different subjects, so each subject only offers the classes where it is taught. For example, tick Basic Science for JSS3, and Mathematics for every SS2 arm, without ticking Mathematics for JSS3.
 4. Send the request. You see nothing until your school admin approves you. The admin may change your roles.
 
 ## Attendance (class teachers)

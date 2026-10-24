@@ -2,7 +2,7 @@
 import { describe, it, beforeAll, afterAll, beforeEach } from "vitest";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
 import { readFileSync } from "node:fs";
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, query, collection, where } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, query, collection, where, writeBatch } from "firebase/firestore";
 
 let env;
 // Whatever UID is in the file (the placeholder or the real owner's), the tests use their own owner, "owner1".
@@ -97,6 +97,17 @@ describe("student management", () => {
     await assertFails(setDoc(doc(db, "schools/s1/students/new2"), { name: "N", classKey: "SS1|A", status: "active" }));
     await assertFails(setDoc(doc(db, "schools/s1/students/new3"), { name: "N", classKey: "SS2|A", status: "pending" }));
     await assertFails(updateDoc(doc(db, "schools/s1/students/st2"), { status: "left" }));
+  });
+  it("a class teacher can add a pending student together with private details in one batch, and the admin can then see it", async () => {
+    const db = as("ctch"); const b = writeBatch(db);
+    b.set(doc(db, "schools/s1/students/new9"), { name: "N", classKey: "SS1|A", status: "pending", admissionNo: "N9" });
+    b.set(doc(db, "schools/s1/students/new9/private/info"), { address: "x", phone: "0803" });
+    await assertSucceeds(b.commit());
+    await assertSucceeds(getDoc(doc(as("adm1"), "schools/s1/students/new9")));
+    const other = writeBatch(db);
+    other.set(doc(db, "schools/s1/students/new8"), { name: "N", classKey: "SS2|A", status: "pending" });
+    other.set(doc(db, "schools/s1/students/new8/private/info"), { address: "x" });
+    await assertFails(other.commit());
   });
   it("a subject teacher can list only the classes they teach", async () => {
     const db = as("subj");
