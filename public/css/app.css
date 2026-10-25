@@ -3,7 +3,7 @@
 .shell.bare .side,.shell.bare .tabs,.shell.bare .top{display:none}
 .shell.bare .main{padding:0}
 .main{min-width:0;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
-.top{display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:var(--z-header)}
+.top{display:flex;justify-content:space-between;align-items:center;gap:var(--space-3);height:4.5rem;box-sizing:border-box;padding:0 var(--space-4);border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:var(--z-header)}
 .top-actions{display:flex;align-items:center;gap:var(--space-3)}
 #view{padding:var(--space-5) var(--space-4);max-width:64rem;outline:none;margin-inline:auto}
 #view h1{font-size:var(--step-3)}#view h2{font-size:var(--step-1);margin:var(--space-5) 0 var(--space-3)}
@@ -93,13 +93,15 @@ textarea{min-height:5rem}.fileinfo{background:var(--surface-2);border-radius:var
 .sname{grid-column:1/-1;display:flex;align-items:center;gap:var(--space-3)}.sname>div{flex:1;min-width:0}.sname .avatar{margin:0}
 .sc{display:block}.sc.main{grid-column:span 3}.sc.bonus{grid-column:span 4}.sc .lab{display:block;font-size:.7rem;color:var(--text-muted);margin-bottom:2px;white-space:nowrap}
 .sc input{width:100%;min-height:46px;text-align:center;font-weight:700;font-size:1.05rem;border-radius:var(--radius-sm)}.sc input::placeholder{color:var(--border);font-weight:400}.sc.bonus input{background:var(--surface-2);font-weight:600}
-.stot{grid-column:1/-1;display:flex;align-items:center;justify-content:flex-end;gap:var(--space-3)}.tot{font:400 1.6rem/1 var(--font-display)}.tot.empty{color:var(--text-muted)}
+.stot{grid-column:1/-1;display:flex;align-items:center;justify-content:flex-end;gap:var(--space-3)}.tot{font:400 1.6rem/1 var(--font-display)}.tot.none{color:var(--text-muted)}
 @media (min-width:900px){
- .sheet{gap:0;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);overflow:hidden}
- .shead{display:grid;grid-template-columns:minmax(11rem,1.7fr) repeat(7,minmax(3.6rem,1fr)) 6.5rem;gap:var(--space-2);padding:var(--space-2) var(--space-4);background:var(--surface-2);font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);position:sticky;top:64px;z-index:4}.shead span{text-align:center}.shead span:first-child{text-align:left}.shead small{font-weight:400}
- .srow{grid-template-columns:minmax(11rem,1.7fr) repeat(7,minmax(3.6rem,1fr)) 6.5rem;border:0;border-bottom:1px solid var(--border);border-radius:0;align-items:center;padding:var(--space-2) var(--space-4)}.srow:last-child{border-bottom:0}
+ .sheet{gap:0;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);overflow:clip}
+ .shead{display:grid;grid-template-columns:minmax(14rem,2.2fr) repeat(7,minmax(3.6rem,1fr)) 6rem;gap:var(--space-2);padding:var(--space-2) var(--space-4);background:var(--surface-2);font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);position:sticky;top:4.5rem;z-index:4;align-items:end}.shead span{text-align:center}.shead span:first-child{text-align:left}.shead small{font-weight:400}
+ .srow{grid-template-columns:minmax(14rem,2.2fr) repeat(7,minmax(3.6rem,1fr)) 6rem;border:0;border-bottom:1px solid var(--border);border-radius:0;align-items:center;padding:6px var(--space-4)}.srow:last-child{border-bottom:0}
  .sname,.stot,.sc.main,.sc.bonus{grid-column:auto}.sc .lab{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
  .sc input{min-height:42px}.stot{justify-content:center}.tot{font-size:1.3rem}.srow.done{border-left:4px solid var(--success)}
 }
 .results table{min-width:30rem}.results .posc{font-weight:800;width:4.5rem}.results .totc{font:400 1.2rem var(--font-display)}.results tr.top{background:var(--accent-soft)}.results tbody th{font-weight:600}
 @media (prefers-reduced-motion:reduce){.kpi-fill,.srow{transition:none}}
+.sname strong{display:block;line-height:1.25}.sname .linkbtn{min-height:28px;font-size:var(--step--1)}
+@media (min-width:900px){.sc input{min-height:40px;font-size:1rem}.stot{gap:var(--space-2)}.tot{font-size:1.2rem;min-width:2.2rem;text-align:right}}

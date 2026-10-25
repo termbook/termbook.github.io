@@ -57,10 +57,10 @@ export async function scoresView(host) {
     }
     function refreshRow(id) {
       const r = rows.get(id); if (!r) return; const x = calc(model(), ui.term, id, w);
-      r.total.textContent = x ? x.t : "–"; r.total.className = `tot${x ? "" : " empty"}`; r.grade.textContent = x ? grade(x.t, grades) : ""; r.grade.className = `gchip ${x ? gcls(grade(x.t, grades)) : "hide"}`; r.row.classList.toggle("done", Boolean(x)); summary();
+      r.total.textContent = x ? x.t : "–"; r.total.className = `tot${x ? "" : " none"}`; r.grade.textContent = x ? grade(x.t, grades) : ""; r.grade.className = `gchip ${x ? gcls(grade(x.t, grades)) : "hide"}`; r.row.classList.toggle("done", Boolean(x)); summary();
     }
     const rowFor = (stu) => {
-      const x = calc(c, ui.term, stu.id, w); const total = h("span", { class: `tot${x ? "" : " empty"}` }, x ? x.t : "–"); const gr = h("span", { class: `gchip ${x ? gcls(grade(x.t, grades)) : "hide"}` }, x ? grade(x.t, grades) : "");
+      const x = calc(c, ui.term, stu.id, w); const total = h("span", { class: `tot${x ? "" : " none"}` }, x ? x.t : "–"); const gr = h("span", { class: `gchip ${x ? gcls(grade(x.t, grades)) : "hide"}` }, x ? grade(x.t, grades) : "");
       const cells = COLS.map(([k, label], i) => { const max = w[k]; const v = c.scores?.[term]?.[stu.id]?.[k];
         const inp = h("input", { type: "number", inputmode: "decimal", min: 0, max, step: "any", value: v ?? "", "data-s": stu.id, "data-k": k, placeholder: "–", "aria-label": `${stu.n} ${label} out of ${max}` });
         inp.addEventListener("input", () => { let val = inp.value; if (val !== "") { const n = Math.min(max, Math.max(0, +val)); if (n !== +val) { val = String(n); inp.value = val; } } const row = ((sheet ||= { subject: cur.subject, scores: {} }).scores[term] ||= {}); const r = (row[stu.id] ||= {}); if (val === "") delete r[k]; else r[k] = +val; if (!Object.keys(r).length) delete row[stu.id]; refreshRow(stu.id); queueSave(stu.id, k, val); });
@@ -68,8 +68,8 @@ export async function scoresView(host) {
         inp.addEventListener("focus", () => inp.select());
         return h("label", { class: `sc ${i > 3 ? "bonus" : "main"}` }, h("span", { class: "lab" }, `${label} /${max}`), inp); });
       const row = h("div", { class: `srow${x ? " done" : ""}`, role: "group", "aria-label": stu.n },
-        h("div", { class: "sname" }, h("span", { class: "avatar", "aria-hidden": "true" }, initials(stu.n)), h("div", {}, h("strong", {}, stu.n), stu.r ? h("span", { class: "tag tag-warn" }, "Repeater") : null),
-          h("button", { class: "linkbtn", type: "button", onclick: () => formDialog(stu.n, (close) => h("div", {}, subjectReport(model(), stu.id, s, w, grades, session), h("div", { class: "dlg-actions" }, h("button", { class: "btn", onclick: () => close() }, "Close"), h("button", { class: "btn btn-primary", onclick: () => printNodes([subjectReport(model(), stu.id, s, w, grades, session)]) }, "Print")))) }, "Report")),
+        h("div", { class: "sname" }, h("span", { class: "avatar", "aria-hidden": "true" }, initials(stu.n)), h("div", {}, h("strong", {}, stu.n), stu.r ? h("span", { class: "tag tag-warn" }, "Repeater") : null,
+          h("button", { class: "linkbtn", type: "button", onclick: () => formDialog(stu.n, (close) => h("div", {}, subjectReport(model(), stu.id, s, w, grades, session), h("div", { class: "dlg-actions" }, h("button", { class: "btn", onclick: () => close() }, "Close"), h("button", { class: "btn btn-primary", onclick: () => printNodes([subjectReport(model(), stu.id, s, w, grades, session)]) }, "Print")))) }, "Report"))),
         cells, h("div", { class: "stot" }, total, gr));
       rows.set(stu.id, { row, total, grade: gr }); return row;
     };

@@ -19,6 +19,7 @@ it("shows a modern score sheet that totals, grades and ranks live", async () => 
     school: { name: "Test School", current: { session: "2026/2027", term: 1 }, structure: { classes: [{ name: "SS2", arms: ["A"] }] }, scoring: { weights: DEFAULT_WEIGHTS, grades: DEFAULT_GRADES } } });
   const host = document.createElement("div"); document.body.append(host); await scoresView(host); await tick();
   const rows = host.querySelectorAll(".srow"); expect(rows.length).toBe(3);
+  expect(rows[0].querySelector(".empty")).toBeNull(); // the total cell must not pick up the page-level .empty style
   expect(host.querySelector(".kpis").textContent).toContain("0 / 3");
   const input = (id, k) => host.querySelector(`input[data-s="${id}"][data-k="${k}"]`);
   const type = (el, v) => { el.value = v; el.dispatchEvent(new Event("input", { bubbles: true })); };
