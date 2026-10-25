@@ -109,7 +109,7 @@ export async function addStudents(list) {
     for (const { _priv, ...s } of list.slice(i, i + 100)) {
       const r = doc(db, sp(`students/${studentIdFor(s.admissionNo)}`));
       b.set(r, { ...s, classKey: classKey(s.class, s.arm), deleted: false, schoolId: effectiveSchoolId(), createdAt: serverTimestamp() });
-      if (_priv && (_priv.address || _priv.phone)) b.set(doc(db, `${r.path}/private/info`), _priv);
+      if (_priv && Object.values(_priv).some(Boolean)) b.set(doc(db, `${r.path}/private/info`), _priv);
     }
     await b.commit();
   }

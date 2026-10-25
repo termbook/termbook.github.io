@@ -1,3 +1,4 @@
+import { fieldForHeader, fieldByKey, optionMatch, TEMPLATE_HEADERS } from "./studentFields.js";
 /** Student rules: class order, promotion, status, duplicates and codes. Pure functions, covered by tests. */
 export const CLASS_ORDER = ["JSS1", "JSS2", "JSS3", "SS1", "SS2", "SS3"];
 export const STATUS = { active: "Active", pending: "Pending", left: "No longer in school", graduated: "Graduated" };
@@ -58,11 +59,19 @@ function splitLine(line) {
   }
   out.push(cur.trim()); return out;
 }
-const HEADERS = [["name", /^(full ?name|name|surname|student( name)?)$/i], ["gender", /^(gender|sex)$/i], ["class", /^class$/i], ["arm", /^arm$/i], ["admissionNo", /^(admission( no\.?| number)?|adm\.? ?no\.?)$/i],
-  ["repeater", /^repeater$/i], ["dob", /^(date of birth|dob|birth ?date)$/i], ["status", /^status$/i], ["parentName", /^(parent|guardian|parent\/guardian|parent or guardian)( name)?$/i],
-  ["address", /^address$/i], ["phone", /^(parent'?s? )?(phone|phone number|mobile|parent phone( number)?|guardian phone)$/i]];
+const HEADERS = [["name", /^(full ?name|name|surname|student( name)?)$/i], ["gender", /^(gender|sex)$/i], ["class", /^class$/i], ["arm", /^(arm|section|arm\/section|arm or section)$/i], ["admissionNo", /^(admission( no\.?| number)?|adm\.? ?no\.?)$/i],
+  ["repeater", /^repeater$/i], ["dob", /^(date of birth|dob|birth ?date)$/i], ["status", /^status$/i]];
 const toIsoDate = (v) => { const t = String(v || "").trim(); let m = t.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/); if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`; m = t.match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? t : ""; };
 const toPhone = (v) => { const d = String(v || "").replace(/[\s-]/g, ""); if (/^[789][01]\d{8}$/.test(d)) return "0" + d; return /^(0[789][01]\d{8}|\+234[789][01]\d{8})$/.test(d) ? d : ""; };
+/** Cleans one extra field's cell by its type. Returns { v, bad }: bad means something was typed but could not be understood. */
+function cleanField(f, raw) {
+  const t = String(raw ?? "").trim(); if (!t) return { v: "", bad: false };
+  if (f.type === "tel") { const v = toPhone(t); return { v, bad: !v }; }
+  if (f.type === "date") { const v = toIsoDate(t); return { v, bad: !v }; }
+  if (f.type === "select") { const v = optionMatch(f, t); return { v, bad: !v }; }
+  if (f.type === "email") { const ok = /^\S+@\S+\.\S+$/.test(t); return { v: ok ? t : "", bad: !ok }; }
+  return { v: t, bad: false };
+}
 
 /**
  * Parses a pasted list or CSV into student rows.
@@ -75,16 +84,22 @@ export function parseStudentRows(text) {
 
 /** Same as parseStudentRows but for rows already split into cells (CSV or Excel files). */
 export function parseStudentTable(table) {
-  const out = []; let map = null; let first = true;
+  const out = []; let map = null; let fmap = {}; let first = true;
   for (const cells0 of table) {
     const cells = cells0.map((c) => String(c ?? "").trim()); if (!cells.some(Boolean)) continue; const i = first ? 0 : 1; first = false;
-    if (i === 0 && cells.some((c) => HEADERS[0][1].test(c)) && cells.length > 1) { map = {}; cells.forEach((c, idx) => { const h = HEADERS.find(([, re]) => re.test(c.trim())); if (h && !(h[0] in map)) map[h[0]] = idx; }); continue; }
+    if (i === 0 && cells.some((c) => HEADERS[0][1].test(c)) && cells.length > 1) {
+      map = {}; fmap = {}; cells.forEach((c, idx) => { const h = HEADERS.find(([, re]) => re.test(c.trim())); if (h) { if (!(h[0] in map)) map[h[0]] = idx; return; } const f = fieldForHeader(c); if (f && !(f in fmap)) fmap[f] = idx; }); continue;
+    }
     if (map) {
       const g = (k) => (map[k] === undefined ? "" : cells[map[k]] || "");
       const name = normName(g("name").replace(/^\d+[.)]\s*/, "")); if (!name) continue;
       const gl = g("gender").toLowerCase(); const rep = g("repeater").toLowerCase();
+      const extra = {}; const badFields = [];
+      for (const [key, idx] of Object.entries(fmap)) { const f = fieldByKey(key); const r = cleanField(f, cells[idx]); if (r.v) extra[key] = r.v; if (r.bad) badFields.push(f.label); }
+      const dobRaw = g("dob");
       out.push({ name, gender: gl.startsWith("m") ? "M" : gl.startsWith("f") ? "F" : "", admissionNo: g("admissionNo"), repeater: ["r", "yes", "y", "repeater", "true"].includes(rep),
-        class: g("class").toUpperCase().replace(/\s+/g, ""), arm: g("arm").trim(), dob: toIsoDate(g("dob")), dobBad: Boolean(g("dob")) && !toIsoDate(g("dob")), parentName: g("parentName"), address: g("address"), phone: toPhone(g("phone")), phoneBad: Boolean(g("phone")) && !toPhone(g("phone")) });
+        class: g("class").toUpperCase().replace(/\s+/g, ""), arm: g("arm").trim(), dob: toIsoDate(dobRaw), dobBad: Boolean(dobRaw) && !toIsoDate(dobRaw),
+        extra, badFields, parentName: extra.parentName || "", address: extra.address || "", phone: extra.phone || "", phoneBad: badFields.includes("Parent/guardian phone") });
       continue;
     }
     const name = (cells[0] || "").replace(/^\d+[.)]\s*/, ""); if (!name) continue;
@@ -107,5 +122,4 @@ export async function readStudentFile(file) {
   return text.replace(/^\uFEFF/, "").split(/\r?\n/).filter((l) => l.trim()).map(splitLine);
 }
 
-/** Column headings of the downloadable students template. Keep in step with the import reader above. */
-export const TEMPLATE_HEADERS = ["Name", "Gender", "Class", "Arm", "Admission no.", "Repeater", "Date of birth", "Parent/guardian name", "Address", "Parent phone"];
+export { TEMPLATE_HEADERS };

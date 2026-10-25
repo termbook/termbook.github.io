@@ -2,7 +2,8 @@ import { h, mount, toast, confirmDialog, formDialog, field, empty, skeleton, dow
 import { state, roleOf, effectiveSchoolId } from "../lib/store.js";
 import { watchStudents, addStudent, addStudents, updateStudent, bulkStudentAction, loadPrivate, issueAccessCode, revokeAccess, loadAccessCode, studentIdFor } from "../lib/data.js";
 import { STATUS, LEFT_REASONS, classKey, promotionTarget, findDuplicates, filterStudents, parseStudentRows, parseStudentTable, readStudentFile, TEMPLATE_HEADERS, makeAdmissionNo, makeAccessCode, normName } from "../lib/students.js";
-import { input, select, classPicker, allArms, classLabel, friendlyAuthError } from "./common.js";
+import { input, select, classPicker, allArms, classLabel, friendlyAuthError, loadNg } from "./common.js";
+import { FIELDS, fieldByKey, splitExtra } from "../lib/studentFields.js";
 import { showDate, parseShown, validPhone } from "../lib/dates.js";
 import { autoParent } from "../lib/attendance.js";
 
@@ -91,17 +92,34 @@ export function studentsView(host) {
 
   function editDialog(s) {
     const isNew = !s; const keyDefault = ui.cls ? classKey(ui.cls, structure.classes.find((c) => c.name === ui.cls)?.arms[0]) : "";
-    const name = input({ id: "n", value: s?.name || "" }); const gender = select([["M", "Male"], ["F", "Female"]], s?.gender || "M");
     const mine = isNew || isAdmin || s.classKey === addKeys; // class teachers edit only their own class
+    const showPrivate = isAdmin || (isNew ? Boolean(addKeys) : s.classKey === addKeys);
+    const controls = []; const track = (el) => (controls.push(el), el);
+    const name = track(input({ id: "n", value: s?.name || "" })); const gender = track(select([["M", "Male"], ["F", "Female"]], s?.gender || "M"));
     const adm = input({ id: "a", value: s?.admissionNo || "", disabled: !mine, placeholder: isNew ? "Leave blank to generate one" : "" });
-    const cp = addKeys ? h("input", { value: classLabel(addKeys), disabled: true, id: "cp" }) : classPicker(structure, s?.classKey || keyDefault);
-    const rep = h("input", { type: "checkbox", checked: Boolean(s?.repeater) }); const dob = input({ id: "d", placeholder: "DD/MM/YYYY", value: showDate(s?.dob) });
-    const par = input({ id: "p", value: s?.parentName || "" }); const addr = input({ id: "ad" }); const ph = input({ id: "ph", type: "tel" });
-    const relOn = h("input", { type: "checkbox" }); const rel = select(["", "Christianity", "Islam", "Traditional", "Other", "Prefer not to say"], ""); rel.hidden = true; relOn.addEventListener("change", () => (rel.hidden = !relOn.checked));
-    const statusSel = isAdmin && !isNew ? select(Object.entries(STATUS), s.status) : null;
+    const cp = addKeys ? h("input", { value: classLabel(addKeys), disabled: true, id: "cp" }) : track(classPicker(structure, s?.classKey || keyDefault));
+    const rep = track(h("input", { type: "checkbox", checked: Boolean(s?.repeater) })); const dob = track(input({ id: "d", placeholder: "DD/MM/YYYY", value: showDate(s?.dob) }));
+    const statusSel = isAdmin && !isNew ? track(select(Object.entries(STATUS), s.status)) : null;
+    const relOn = track(h("input", { type: "checkbox" })); const rel = track(select(["", "Christianity", "Islam", "Traditional", "Other", "Prefer not to say"], "")); rel.hidden = true; relOn.addEventListener("change", () => (rel.hidden = !relOn.checked));
+    // Every other detail comes from the shared field list, so the form and the template always match.
+    const inputs = {}; let ng = [];
+    const stateSel = () => inputs.stateOfOrigin, lgaSel = () => inputs.lgaOfOrigin;
+    const fillLga = (keep) => { const l = ng.find((x) => x.name === stateSel().value)?.lgas || []; lgaSel().replaceChildren(...[["", "Choose local government"], ...l.map((x) => [x, x])].map(([v2, t]) => h("option", { value: v2, selected: v2 === keep }, t))); };
+    for (const f of FIELDS) {
+      const id = "f_" + f.key; let el;
+      if (f.type === "textarea") el = h("textarea", { id, rows: 2 });
+      else if (f.type === "select") el = select([["", "Not given"], ...f.options.map((o) => [o, o])], "", { id });
+      else if (f.type === "state") el = select([["", "Choose state"]], "", { id, onchange: () => fillLga("") });
+      else if (f.type === "lga") el = select([["", "Choose state first"]], "", { id });
+      else el = input({ id, type: f.type === "tel" ? "tel" : f.type === "email" ? "email" : "text", placeholder: f.type === "date" ? "DD/MM/YYYY" : f.type === "tel" ? "08031234567" : "", inputmode: f.type === "tel" ? "tel" : null });
+      inputs[f.key] = track(el);
+    }
+    loadNg().then((list) => { ng = list; stateSel().replaceChildren(...[["", "Choose state"], ...ng.map((x) => [x.name, x.name])].map(([v2, t]) => h("option", { value: v2, selected: v2 === stateSel().dataset.v }, t))); fillLga(lgaSel().dataset.v || ""); });
+    const setVal = (key, val) => { const el = inputs[key]; if (!el) return; const f = fieldByKey(key); const v2 = f.type === "date" ? showDate(val) : val || ""; el.value = v2; if (f.type === "state" || f.type === "lga") el.dataset.v = v2; };
+    if (s) { setVal("admissionDate", s.admissionDate); setVal("parentName", s.parentName); }
+    if (s && showPrivate) loadPrivate(s.id).then((p) => { for (const f of FIELDS) if (f.store === "private") setVal(f.key, p[f.key]); if (p.religion) { relOn.checked = true; rel.hidden = false; rel.value = p.religion; } if (ng.length) { stateSel().value = p.stateOfOrigin || ""; fillLga(p.lgaOfOrigin || ""); } });
+    if (isNew) setVal("nationality", "Nigerian");
     const out = h("p", { class: "form-msg", role: "alert", hidden: true }); const codeBox = h("div", {});
-    const canPrivate = isAdmin || Boolean(addKeys); 
-    if (s && canPrivate) loadPrivate(s.id).then((p) => { addr.value = p.address || ""; ph.value = p.phone || ""; if (p.religion) { relOn.checked = true; rel.hidden = false; rel.value = p.religion; } });
     if (s && isAdmin) renderCode();
     async function renderCode() {
       const c = await loadAccessCode(s.id).catch(() => null);
@@ -110,35 +128,56 @@ export function studentsView(host) {
           c?.active ? h("button", { class: "btn btn-sm btn-danger-quiet", type: "button", onclick: async () => { if (await confirmDialog({ title: "Revoke parent access?", body: "The code stops working and any linked parent loses access.", confirmLabel: "Revoke", danger: true })) { await revokeAccess(s); renderCode(); } } }, "Revoke access") : null));
     }
     const save = h("button", { class: "btn btn-primary", type: "submit" }, isNew ? "Add student" : "Save changes");
-    if (!mine) { [name, gender, rep, dob, par, addr, ph, relOn, rel].forEach((x) => (x.disabled = true)); save.disabled = true; }
+    if (!mine) { [...controls, rel].forEach((x) => (x.disabled = true)); save.disabled = true; }
+    const sect = (key, title, hint, priv) => {
+      const fs = FIELDS.filter((f) => f.group === key);
+      return h("fieldset", { class: `sect${priv ? " sect-private" : ""}` }, h("legend", {}, title), hint ? h("p", { class: "hint" }, hint) : null,
+        h("div", { class: "form-grid" }, fs.map((f) => { const wrap = field(f.label, inputs[f.key]); if (f.type === "textarea") wrap.classList.add("full"); return wrap; }),
+          key === "contact" ? h("div", { class: "field" }, h("label", { for: "ap" }, "Fill the name from the student's surname"), h("button", { id: "ap", class: "btn btn-sm", type: "button", onclick: () => (inputs.parentName.value = autoParent(name.value)) }, "Auto-fill")) : null));
+    };
     formDialog(isNew ? "Add student" : s.name, (close) => h("form", { novalidate: true, onsubmit: async (e) => {
       e.preventDefault(); out.hidden = true; const nm = normName(name.value); const key = addKeys || cp.value;
-      const fail = (t) => { out.textContent = t; out.className = "form-msg error"; out.hidden = false; };
+      const fail = (t) => { out.textContent = t; out.className = "form-msg error"; out.hidden = false; out.scrollIntoView({ block: "nearest" }); };
       if (!nm) return fail("Enter the student's name (surname first)."); if (!key) return fail("Choose a class and arm.");
-      if (dob.value && !parseShown(dob.value)) return fail("Date of birth must be DD/MM/YYYY."); if (ph.value && !validPhone(ph.value)) return fail("Enter a valid parent phone number.");
-      const [c, a] = key.split("|"); const taken = new Set(all.map((x) => x.admissionNo)); const admNo = adm.value.trim() || s?.admissionNo || makeAdmissionNo(taken);
+      if (dob.value && !parseShown(dob.value)) return fail("Date of birth must be DD/MM/YYYY.");
       if (!isNew && mine) { const nn = adm.value.trim(); if (!nn) return fail("The admission number cannot be empty."); if (nn !== s.admissionNo && all.some((x) => x.id !== s.id && x.admissionNo === nn)) return fail("Another student already has that admission number."); }
-      const rec = { name: nm, gender: gender.value, class: c, arm: a, repeater: rep.checked, dob: parseShown(dob.value), parentName: par.value.trim() };
-      const priv = { address: addr.value.trim(), phone: ph.value.replace(/[\s-]/g, ""), religion: relOn.checked ? rel.value : "" };
+      const stuExtra = {}, priv = {};
+      for (const f of FIELDS) {
+        const raw = String(inputs[f.key].value || "").trim(); let val = raw;
+        if (raw && f.type === "tel") { if (!validPhone(raw)) return fail(`${f.label}: enter a valid Nigerian phone number.`); val = raw.replace(/[\s-]/g, ""); }
+        if (raw && f.type === "email" && !/^\S+@\S+\.\S+$/.test(raw)) return fail(`${f.label}: enter a valid email address.`);
+        if (raw && f.type === "date") { val = parseShown(raw); if (!val) return fail(`${f.label} must be DD/MM/YYYY.`); }
+        if (f.store === "student") stuExtra[f.key] = val; else if (showPrivate) priv[f.key] = val;
+      }
+      if (showPrivate) priv.religion = relOn.checked ? rel.value : "";
+      const [c, a] = key.split("|"); const taken = new Set(all.map((x) => x.admissionNo)); const admNo = adm.value.trim() || s?.admissionNo || makeAdmissionNo(taken);
+      const rec = { name: nm, gender: gender.value, class: c, arm: a, repeater: rep.checked, dob: parseShown(dob.value), ...stuExtra };
       try {
         if (isNew) {
           const dups = findDuplicates(all, { ...rec, admissionNo: admNo, classKey: key });
           if (dups.length && !await confirmDialog({ title: "Possible duplicate", body: `${dups[0].name} (${classLabel(dups[0].classKey)}, ${dups[0].admissionNo}) looks like this student. Add anyway?`, confirmLabel: "Add anyway" })) return;
-          await addStudent({ ...rec, admissionNo: admNo, status: isAdmin ? "active" : "pending" }, priv); toast(isAdmin ? "Student added" : "Student added. The admin will confirm.");
+          await addStudent({ ...rec, admissionNo: admNo, status: isAdmin ? "active" : "pending" }, showPrivate ? priv : null); toast(isAdmin ? "Student added" : "Student added. The admin will confirm.");
         } else {
           if (statusSel) rec.status = statusSel.value;
           if (mine) rec.admissionNo = adm.value.trim();
           if (rec.name !== s.name) { const dups = findDuplicates(all, { ...rec, id: s.id, admissionNo: "", classKey: s.classKey }); if (dups.length && !await confirmDialog({ title: "Same name in this class", body: `${dups[0].name} is already in ${classLabel(dups[0].classKey)}. Save the new name anyway?`, confirmLabel: "Save anyway" })) return; }
-          await updateStudent(s.id, rec, priv, s); toast("Saved");
+          await updateStudent(s.id, rec, showPrivate ? priv : null, s); toast("Saved");
         }
         close("ok");
       } catch (err) { fail(friendlyAuthError(err)); }
-    } }, field("Full name (surname first)", name), field("Gender", gender), field("Admission number", adm, isNew ? "You can correct it later if it is wrong." : mine ? "Correcting it keeps the student's attendance, scores and parent access. Tell the parent the new number." : "You can view this student, but only their class teacher or the admin can edit."), field(addKeys ? "Class (yours)" : "Class and arm", cp),
-      h("label", { class: "chk" }, rep, "Repeater"), statusSel ? field("Status", statusSel) : null, field("Date of birth (optional)", dob),
-      h("div", { class: "field" }, h("label", { for: "p" }, "Parent or guardian"), par, h("button", { class: "btn btn-sm", type: "button", onclick: () => (par.value = autoParent(name.value)) }, "Auto-fill")),
-      canPrivate ? [h("p", { class: "hint" }, "The next fields are visible only to the school admin and this class's teacher."), field("Address (optional)", addr), field("Parent phone (optional)", ph),
-        h("label", { class: "chk" }, relOn, "Record religion (optional, sensitive)"), rel] : null,
-      out, h("div", { class: "dlg-actions" }, h("button", { class: "btn", type: "button", onclick: () => close("no") }, "Cancel"), save), isAdmin && s ? codeBox : null));
+    } },
+      h("div", {},
+        h("fieldset", { class: "sect" }, h("legend", {}, "Student details"), h("div", { class: "form-grid" },
+          field("Full name (surname first)", name), field("Gender", gender), field(addKeys ? "Class (yours)" : "Class and arm", cp),
+          field("Admission number", adm, isNew ? "You can correct it later if it is wrong." : mine ? "Correcting it keeps the student's attendance, scores and parent access. Tell the parent the new number." : "You can view this student, but only their class teacher or the admin can edit."),
+          field("Date of birth", dob), statusSel ? field("Status", statusSel) : null,
+          FIELDS.filter((f) => f.group === "student").map((f) => { if (f.store === "private" && !showPrivate) return null; const w = field(f.label, inputs[f.key]); if (f.type === "textarea") w.classList.add("full"); return w; }),
+          h("div", { class: "field" }, h("label", { class: "chk" }, rep, "Repeater"))),
+          showPrivate ? h("div", {}, h("label", { class: "chk" }, relOn, "Record religion (optional, sensitive)"), rel) : null)),
+      showPrivate ? [sect("contact", "Parent or guardian (main contact)", "Visible to the school admin and this class's teacher only.", true), sect("family", "Father and mother (optional)", null, true), sect("emergency", "Emergency contact", "Someone to call if the parent cannot be reached.", true),
+        sect("health", "Health (private)", "Optional. Health information is sensitive: only the school admin and this class's teacher can see it. Enter only what the family has told the school.", true), sect("other", "Other", null, true)] : null,
+      out, isAdmin && s ? codeBox : null,
+      h("div", { class: "dlg-actions sticky" }, h("button", { class: "btn", type: "button", onclick: () => close("no") }, "Cancel"), save)), true);
   }
 
   function bulkAddDialog() {
@@ -153,9 +192,11 @@ export function studentsView(host) {
     } });
     const rowsNow = () => fileRows || parseStudentRows(ta.value);
     function showInfo(name) {
-      const r = fileRows; const noGender = r.filter((x) => !x.gender).length, badDob = r.filter((x) => x.dobBad).length, badPh = r.filter((x) => x.phoneBad).length;
-      const problems = [noGender && `${noGender} without a gender (they will be set to Male: fix them afterwards)`, badDob && `${badDob} with a date of birth that is not DD/MM/YYYY (left blank)`, badPh && `${badPh} with a phone number that is not valid (left blank)`].filter(Boolean);
-      mount(info, h("p", {}, h("strong", {}, `${name}: ${r.length} student${r.length === 1 ? "" : "s"} found`)), problems.length ? h("ul", {}, problems.map((x) => h("li", {}, x))) : h("p", { class: "muted" }, "Everything in the file was read correctly."),
+      const r = fileRows; const noGender = r.filter((x) => !x.gender).length, badDob = r.filter((x) => x.dobBad).length;
+      const bad = {}; r.forEach((x) => (x.badFields || []).forEach((l) => (bad[l] = (bad[l] || 0) + 1)));
+      const withDetails = r.filter((x) => Object.keys(x.extra || {}).length).length;
+      const problems = [noGender && `${noGender} without a gender (they will be set to Male: fix them afterwards)`, badDob && `${badDob} with a date of birth that is not DD/MM/YYYY (left blank)`, ...Object.entries(bad).map(([l, n]) => `${n} with "${l}" that could not be read (left blank)`)].filter(Boolean);
+      mount(info, h("p", {}, h("strong", {}, `${name}: ${r.length} student${r.length === 1 ? "" : "s"} found`), withDetails ? ` · ${withDetails} with family, health or other details` : ""), problems.length ? h("ul", {}, problems.map((x) => h("li", {}, x))) : h("p", { class: "muted" }, "Everything in the file was read correctly."),
         h("button", { class: "btn btn-sm", type: "button", onclick: () => { fileRows = null; file.value = ""; info.hidden = true; } }, "Remove file")); info.hidden = false;
     }
     const validKey = (c, a) => structure.classes.some((x) => x.name === c && x.arms.includes(a)) ? classKey(c, a) : "";
@@ -167,13 +208,14 @@ export function studentsView(host) {
         if (!key) { wrongClass.push(r.name); continue; } if (addKeys && key !== addKeys) { wrongClass.push(r.name); continue; }
         if (r.admissionNo && taken.has(r.admissionNo)) { skipped.push(r.name); continue; }
         const adm = r.admissionNo || makeAdmissionNo(taken); taken.add(adm); const [c, a] = key.split("|");
-        list.push({ name: r.name, gender: r.gender || "M", repeater: Boolean(r.repeater), admissionNo: adm, class: c, arm: a, status: isAdmin ? "active" : "pending", parentName: r.parentName || "", dob: r.dob || "", _priv: { address: r.address || "", phone: r.phone || "", religion: "" } });
+        const { student: stuX, priv: privX } = splitExtra(r.extra || {});
+        list.push({ name: r.name, gender: r.gender || "M", repeater: Boolean(r.repeater), admissionNo: adm, class: c, arm: a, status: isAdmin ? "active" : "pending", dob: r.dob || "", parentName: "", ...stuX, _priv: privX });
       }
       if (!list.length) return fail(wrongClass.length ? "No students could be placed. Choose a class and arm, or check the Class and Arm columns." : "Nothing to add.");
       const notes = [skipped.length && `${skipped.length} skipped because the admission number already exists.`, wrongClass.length && `${wrongClass.length} skipped because their class or arm ${addKeys ? "is not your class" : "is missing or not in your school's list"}.`, !isAdmin && "They will wait for the admin to confirm."].filter(Boolean).join(" ");
       if (!await confirmDialog({ title: `Add ${list.length} student(s)?`, body: notes || "Check the list, then confirm.", confirmLabel: "Add" })) return;
       try { await addStudents(list); toast(`${list.length} students added`); close("ok"); } catch (err) { fail(friendlyAuthError(err)); }
-    } }, h("p", { class: "muted" }, "Choose the filled students file (CSV or Excel). It is read exactly as saved: name, gender, class, arm, admission number, repeater, date of birth and, if present, parent name, address and parent phone."),
+    } }, h("p", { class: "muted" }, "Choose the filled students file (CSV or Excel). It is read exactly as saved: every column of the template is picked up by its heading, including family, emergency contact, health and other details. Columns you leave out are simply skipped."),
       h("p", {}, h("button", { class: "btn btn-sm", type: "button", onclick: () => downloadCsv("students-template.csv", [TEMPLATE_HEADERS]) }, "Download the blank template")),
       field("Student file", file), info, field("Class and arm", cp, "Used for any student whose row has no valid Class and Arm."), ta, out,
       h("div", { class: "dlg-actions" }, h("button", { class: "btn", type: "button", onclick: () => close("no") }, "Cancel"), h("button", { class: "btn btn-primary", type: "submit" }, "Review and add"))));

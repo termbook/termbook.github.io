@@ -30,8 +30,8 @@ export function confirmDialog({ title, body, confirmLabel = "Confirm", danger = 
   });
 }
 /** Dialog with a form body. build(close) returns the content. */
-export function formDialog(title, build) {
-  const d = h("dialog", { class: "dlg", "aria-labelledby": "dlg-t" }, h("h2", { id: "dlg-t" }, title));
+export function formDialog(title, build, wide = false) {
+  const d = h("dialog", { class: wide ? "dlg dlg-wide" : "dlg", "aria-labelledby": "dlg-t" }, h("h2", { id: "dlg-t" }, title));
   d.append(build((v) => d.close(v)));
   d.addEventListener("close", () => d.remove());
   document.body.append(d); d.showModal(); return d;

@@ -10,7 +10,7 @@ Every school's data lives under `schools/{schoolId}/...`. Access is decided by `
 | `users/{uid}` | role, school, status, class teacher key, assignments, `links` (parents) | self, school admin, owner | self (limited), admin (teachers), owner |
 | `schools/{sid}` | details, structure, scoring, current session and term, status | school staff, owner | admin (not status), owner |
 | `schools/{sid}/students/{admissionKey}` | name, gender, class, arm, `classKey`, status, repeater, soft-delete flag | admin, owner, teachers of that class, linked parent | admin, owner, class teacher (pending only) |
-| `.../students/{id}/private/info` | address, parent phone, religion | admin, owner, class teacher | same |
+| `.../students/{id}/private/info` | home address, origin, previous school, parent/guardian, father, mother and emergency contact details, health details, transport and notes, religion (optional) | admin, owner, class teacher | same |
 | `.../admissionIndex/{admissionKey}` | maps a corrected admission number to the student's record id | admin, owner, staff; a parent can look up one number | admin, owner; class teacher (create or delete, own class) |
 | `.../accessCodes/{studentId}` | parent code, active flag | admin, owner | admin, owner |
 | `.../links/{uid_studentId}` | parent link (code checked by rules) | admin, owner, that parent | parent (with correct code), admin |
