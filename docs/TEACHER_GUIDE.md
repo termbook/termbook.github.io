@@ -14,9 +14,11 @@ Class teachers can add students to their own class and arm with the full form (s
 
 ## Scores (subject teachers)
 1. Open **Scores** and choose a class and subject at the top.
-2. Pick the term. Type marks; limits are enforced and **Enter** moves to the next student. "Saved ✓" confirms saving.
-3. The bonus marks (attendance, textbook, notebook) are added to the exam when **Add bonus marks to exam** is ticked. The exam never goes above its maximum.
-4. **Report** shows one student's subject report. **Class > Export to Excel** makes the paper scoresheet layout.
+2. Pick the term. The top of the page shows how many students are scored, the class average, the highest and lowest totals, and how many students have each grade.
+3. Type marks in the sheet. On a computer each student is one row; on a phone each student is a card. Limits are enforced, and **Enter** or the **down arrow** moves to the same box for the next student (the up arrow goes back). The total and grade update as you type, and a green edge shows a student is scored.
+4. Use **Male**, **Female** and **Not scored yet** to narrow the list, or search by name. "Saved ✓" confirms saving.
+5. The bonus marks (attendance, textbook, notebook) are added to the exam when **Add bonus marks to exam** is ticked. The exam never goes above its maximum.
+6. **Results** shows the ranking for one term or the whole year, with grades and positions, and can be exported to CSV. **Report** shows one student's subject report. **Class > Export to Excel** makes the paper scoresheet layout.
 
 You can edit only your own subjects. Class teachers and admins can read every subject for their class.
 
