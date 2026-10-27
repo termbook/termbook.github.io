@@ -129,6 +129,23 @@ describe("student management", () => {
     await assertFails(setDoc(doc(as("parent1"), "schools/s1/admissionIndex/X1"), { studentId: "st1" }));
     await assertFails(getDoc(doc(as("other"), "schools/s1/admissionIndex/B9")));
   });
+  it("a class teacher writes ratings and the tutor's comment for their own class; only the admin writes the principal's comment", async () => {
+    const ct = as("ctch"), r = (id) => doc(ct, `schools/s1/remarks/${id}`);
+    await assertSucceeds(setDoc(r("t1_st2"), { studentId: "st2", classKey: "SS1|A", termId: "t1", ratings: { punctuality: 5 }, tutorComment: "Good" }));
+    await assertSucceeds(updateDoc(r("t1_st2"), { tutorComment: "Better", ratings: { punctuality: 4 } }));
+    await assertFails(updateDoc(r("t1_st2"), { principalComment: "Hacked" }));
+    await assertFails(setDoc(r("t1_new"), { studentId: "st2", classKey: "SS1|A", termId: "t1", principalComment: "No" }));
+    await assertFails(setDoc(r("t1_st1"), { studentId: "st1", classKey: "SS2|A", termId: "t1", tutorComment: "Other class" }));
+    await assertFails(setDoc(r("t1_lie"), { studentId: "st1", classKey: "SS1|A", termId: "t1" })); // claims the wrong class for that student
+    await assertSucceeds(setDoc(doc(as("adm1"), "schools/s1/remarks/t1_st2"), { studentId: "st2", classKey: "SS1|A", termId: "t1", principalComment: "Well done" }, { merge: true }));
+    await assertFails(getDoc(doc(as("parent1"), "schools/s1/remarks/t1_st2")));
+    await assertFails(getDoc(doc(as("subj"), "schools/s1/remarks/t1_st2")));
+  });
+  it("only the admin changes report card branding; it is allowed on the school record", async () => {
+    await assertSucceeds(updateDoc(doc(as("adm1"), "schools/s1"), { report: { heading: "X" }, branding: { logo: "data:image/png;base64,AA" } }));
+    await assertFails(updateDoc(doc(as("ctch"), "schools/s1"), { report: { heading: "Y" } }));
+    await assertSucceeds(updateDoc(doc(as("adm1"), "publicSchools/s1"), { name: "One", state: "Lagos", lga: "Ikeja", branding: { logo: "data:image/png;base64,AA" } }));
+  });
   it("a subject teacher can list only the classes they teach", async () => {
     const db = as("subj");
     await assertSucceeds(getDocs(query(collection(db, "schools/s1/students"), where("classKey", "==", "SS2|A"))));

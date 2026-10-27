@@ -22,5 +22,11 @@ Class teachers can add students to their own class and arm with the full form (s
 
 You can edit only your own subjects. Class teachers and admins can read every subject for their class.
 
-## Report cards
-Class teachers open **Reports** for combined report cards and **Print all report cards**.
+## Report cards (class teachers only)
+Only the class teacher of a class sees **Reports**, and only for their own class. Subject teachers do not see it.
+Choose the term to see every student's report card.
+- **Conduct and comments** (one student): rate the eight behavioural and seven psychomotor traits from Excellent (5) to Fair (1), or pick a **template** to fill all fifteen at once and then change any. A trait left as Not rated is left out of the total. Write the class tutor's comment, or pick a comment template (including one matched to the student's result).
+- **Apply templates** (many students): choose everyone in the class or only the ticked students, then a conduct template and/or a tutor's comment template. Ratings and comments already entered are kept unless you tick Replace.
+- Conduct templates: Excellent (all 5), Very good (mostly 4 with some 5), Good (all 4), Average (all 3), Needs improvement (all 2).
+- **View card** shows the card as it will print. **Print / save as PDF** uses your browser's print window. **Print all report cards** prints the whole class, one page each.
+The principal's comment is added by the school admin.

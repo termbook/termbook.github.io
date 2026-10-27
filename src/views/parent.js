@@ -1,8 +1,8 @@
 import { h, mount, toast, empty, field, skeleton } from "../lib/dom.js";
 import { state } from "../lib/store.js";
-import { publicSchools, linkChild, myChild, reportsForStudent, termId, currentSessionLabel } from "../lib/data.js";
+import { publicSchools, linkChild, myChild, reportsForStudent, termId, currentSessionLabel, publicSchoolBranding } from "../lib/data.js";
 import { input, select, msg, friendlyAuthError, loadNg } from "./common.js";
-import { reportCard } from "./reports.js";
+import { renderReportCard } from "./reportcard.js";
 import { printNodes } from "./scores.js";
 
 export async function parentView(host) {
@@ -14,8 +14,9 @@ export async function parentView(host) {
     let child = null; try { child = await myChild(l.schoolId, l); } catch { /* link revoked */ }
     if (!child) { cards.push(h("div", { class: "card" }, h("p", {}, `Access to admission number ${l.admissionNo} is no longer available. Ask the school for a new code.`))); continue; }
     const tids = sessions.flatMap((s) => [3, 2, 1].map((t) => termId(s, t))); const reports = await reportsForStudent(l.schoolId, l.studentId, tids);
+    const logos = reports.length ? await publicSchoolBranding(l.schoolId) : {};
     cards.push(h("section", { class: "card" }, h("h2", {}, child.name), h("p", { class: "muted" }, `${child.class}${child.arm} · Admission no. ${child.admissionNo}`),
-      reports.length ? reports.map((r) => h("div", {}, reportCard(r, null, r.session), h("button", { class: "btn btn-sm", onclick: () => printNodes([reportCard(r, null, r.session)]) }, "Print"))) : h("p", { class: "muted" }, "Results will appear here after the school publishes the term.")));
+      reports.length ? reports.map((r) => h("div", { class: "rc-scroll" }, renderReportCard(r.card, logos), h("button", { class: "btn btn-sm btn-primary", onclick: () => printNodes([renderReportCard(r.card, logos)]) }, "Print / save as PDF"))) : h("p", { class: "muted" }, "Results will appear here after the school publishes the term.")));
   }
   const ng = await loadNg(); const schools = await publicSchools().catch(() => []);
   const st = select([["", "Choose state"], ...ng.map((x) => [x.name, x.name])], ""); const lga = select([["", "Choose local government"]], ""); const sch = select([["", "Choose school"]], "");

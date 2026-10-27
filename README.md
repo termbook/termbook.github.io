@@ -21,7 +21,7 @@ Termbook gives each school a daily AM/PM attendance register and per-subject sco
 
 - Daily AM/PM register with weekly and term reports, an at-risk flag and CSV export.
 - Score sheets with continuous assessment, exam, bonus marks, grades, positions, annual totals and Excel export.
-- Combined report cards per student, published to parents only when the school releases the term.
+- Printable student report cards in the Oyo State layout, with conduct ratings, comments and attendance, published to parents only when the school releases the term.
 - School setup: classes, arms, subjects, session and term, score weights and grade boundaries.
 - Student management for admins: full list, promote, move, tag as no longer in school, soft-delete and restore, and bulk import from a downloadable CSV or Excel template.
 - Teacher registration with admin approval and role assignment.

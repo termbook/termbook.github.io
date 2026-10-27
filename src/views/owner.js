@@ -2,7 +2,8 @@ import { h, mount, toast, empty, skeleton, confirmDialog, field } from "../lib/d
 import { state } from "../lib/store.js";
 import { ownerSchools, ownerSetSchoolStatus, getPlatform, setPlatform, loadAudit, nationalHolidays, saveNationalHolidays } from "../lib/data.js";
 import { input, friendlyAuthError } from "./common.js";
-import { parseShown, showDate } from "../lib/dates.js";
+import { showDate } from "../lib/dates.js";
+import { dateSelect } from "../lib/datepick.js";
 
 export async function ownerSchoolsView(host, manage) {
   mount(host, h("h1", {}, "Schools"), skeleton(4)); let list; try { list = await ownerSchools(); } catch (e) { return mount(host, h("h1", {}, "Schools"), empty("Cannot load schools", friendlyAuthError(e))); }
@@ -24,10 +25,10 @@ export async function auditView(host) {
 export async function ownerSettingsView(host) {
   const p = await getPlatform(); const nat = await nationalHolidays(); const out = h("p", { hidden: true, role: "status" });
   const ver = h("input", { type: "checkbox", checked: p.requireVerification !== false, onchange: async (e) => { try { await setPlatform({ requireVerification: e.target.checked }); toast("Saved"); } catch (err) { toast(friendlyAuthError(err), "error"); e.target.checked = !e.target.checked; } } });
-  const date = input({ placeholder: "DD/MM/YYYY", "aria-label": "Date" }), why = input({ placeholder: "Name of holiday", "aria-label": "Holiday name" }); const list = h("div", {});
+  const date = dateSelect({ id: "nh", label: "Holiday date", from: new Date().getFullYear(), to: new Date().getFullYear() + 2, order: "asc" }), why = input({ placeholder: "Name of holiday", "aria-label": "Holiday name" }); const list = h("div", {});
   const drawN = () => mount(list, nat.length ? h("div", { class: "list" }, nat.sort((a, b) => a.date.localeCompare(b.date)).map((x, i) => h("div", { class: "row-card" }, h("div", {}, h("strong", {}, showDate(x.date)), h("div", { class: "hint" }, x.reason)), h("button", { class: "btn btn-sm btn-danger-quiet", onclick: async () => { nat.splice(nat.indexOf(x), 1); await saveNationalHolidays(nat); drawN(); } }, "Remove")))) : h("p", { class: "muted" }, "No national holidays published."));
   drawN();
   mount(host, h("h1", {}, "Settings"), h("section", { class: "card" }, h("h2", {}, "School verification"), h("label", { class: "chk" }, ver, "New schools must be verified by me before teachers can find them"), h("p", { class: "hint" }, "Switch off to let schools go live immediately.")),
     h("section", { class: "card" }, h("h2", {}, "National public holidays"), h("p", { class: "muted" }, "Each school's admin can accept these with one tap. Nothing is added to a school automatically."),
-      h("div", { class: "filters" }, date, why, h("button", { class: "btn btn-primary", onclick: async () => { const d = parseShown(date.value); if (!d || !why.value.trim()) return toast("Enter a date (DD/MM/YYYY) and a name", "error"); nat.push({ date: d, reason: why.value.trim() }); try { await saveNationalHolidays(nat); date.value = why.value = ""; drawN(); } catch (e) { toast(friendlyAuthError(e), "error"); } } }, "Publish")), list));
+      h("div", { class: "filters" }, date, why, h("button", { class: "btn btn-primary", onclick: async () => { const d = date.value; if (!d || !why.value.trim()) return toast("Choose the full date and enter a name", "error"); nat.push({ date: d, reason: why.value.trim() }); try { await saveNationalHolidays(nat); date.value = ""; why.value = ""; drawN(); } catch (e) { toast(friendlyAuthError(e), "error"); } } }, "Publish")), list));
 }

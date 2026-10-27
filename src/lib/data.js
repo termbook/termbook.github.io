@@ -13,8 +13,8 @@ export const col = (path) => collection(db, path);
 export const ref = (path) => doc(db, path);
 
 export const DEFAULT_STRUCTURE = {
-  classes: ["JSS1", "JSS2", "JSS3", "SS1", "SS2", "SS3"].map((name) => ({ name, arms: ["A", "B"] })),
-  departments: ["Science", "Arts", "Commercial"],
+  classes: ["JSS1", "JSS2", "JSS3", "SS1", "SS2", "SS3"].map((name) => ({ name, arms: [] })), // add arms (A, B, C...) in Setup if a class has them
+  departments: ["Science", "Arts", "Commercial", "Technical"],
   subjectsByLevel: DEFAULT_SUBJECTS_BY_LEVEL,
   subjects: unionSubjects(DEFAULT_SUBJECTS_BY_LEVEL),
 };
@@ -78,7 +78,12 @@ export async function saveNationalHolidays(list) { await setDoc(ref("config/holi
 // ---- school settings ----
 export async function saveSchool(patch) {
   await updateDoc(ref(sp()), patch); state.school = { ...state.school, ...patch };
-  if (patch.structure && state.school.status === "verified") await updateDoc(ref(`publicSchools/${effectiveSchoolId()}`), { name: state.school.name, state: state.school.state, lga: state.school.lga, structure: patch.structure }).catch(() => {}); await audit("school_settings", sp(), Object.keys(patch)); }
+  if ((patch.structure || patch.branding || patch.name) && state.school.status === "verified") {
+    const pub = {}; if (patch.name) pub.name = patch.name; if (patch.structure) pub.structure = patch.structure; if (patch.branding) pub.branding = { logo: patch.branding.logo || "", stateLogo: patch.branding.stateLogo || "" };
+    await updateDoc(ref(`publicSchools/${effectiveSchoolId()}`), pub).catch(() => {});
+  }
+  await audit("school_settings", sp(), Object.keys(patch));
+}
 
 // ---- students ----
 /** Live list of every student in the school (admin/owner) or of the teacher's classes. Returns an unsubscribe function. */
@@ -192,7 +197,7 @@ export async function linkChild({ schoolId, admissionNo, code, childName }) {
 }
 
 // ---- attendance ----
-const attId = (key, date) => `${key.replace(/\|/g, "-")}_${date}`;
+const attId = (key, date) => `${key.replace("|", "-")}_${date}`;
 export function watchAttendance(key, from, to, cb) {
   return onSnapshot(query(col(sp("attendance")), where("classKey", "==", key), where("date", ">=", from), where("date", "<=", to)), (s) => {
     const m = {}; s.docs.forEach((d) => { const x = d.data(); m[x.date] = x.marks || {}; }); cb(m);
@@ -242,3 +247,27 @@ export async function reportsForStudent(schoolId, studentId, tids) { const out =
 
 // ---- backup ----
 export async function exportCollection(name) { const s = await getDocs(col(sp(name))); return s.docs.map((d) => ({ id: d.id, ...d.data() })); }
+
+// ---- report card remarks (conduct ratings and comments) ----
+export async function saveRemarks(session, term, student, patch) {
+  const tid = termId(session, term);
+  await setDoc(ref(sp(`remarks/${tid}_${student.id}`)), { studentId: student.id, classKey: student.classKey, termId: tid, session, term, ...patch, updatedAt: serverTimestamp(), updatedBy: auth.currentUser.uid }, { merge: true });
+  await audit("report_remarks", student.id, { term: tid });
+}
+export async function loadRemarks(session, term, key) {
+  const tid = termId(session, term); const q = key ? query(col(sp("remarks")), where("termId", "==", tid), where("classKey", "==", key)) : query(col(sp("remarks")), where("termId", "==", tid));
+  const s = await getDocs(q); const m = {}; s.docs.forEach((x) => (m[x.data().studentId] = x.data())); return m;
+}
+/** The school's public logos, for parents' report cards. */
+export async function publicSchoolBranding(schoolId) { try { const s = await getDoc(ref(`publicSchools/${schoolId}`)); return s.exists() ? { logo: s.data().branding?.logo || "", stateLogo: s.data().branding?.stateLogo || "" } : {}; } catch { return {}; } }
+
+/** Writes conduct ratings and comments for many students at once. items: [{ student, patch }]. */
+export async function saveRemarksBulk(session, term, items) {
+  const tid = termId(session, term);
+  for (let i = 0; i < items.length; i += 100) {
+    const b = writeBatch(db);
+    for (const { student, patch } of items.slice(i, i + 100)) b.set(ref(sp(`remarks/${tid}_${student.id}`)), { studentId: student.id, classKey: student.classKey, termId: tid, session, term, ...patch, updatedAt: serverTimestamp(), updatedBy: auth.currentUser.uid }, { merge: true });
+    await b.commit();
+  }
+  await audit("report_remarks_bulk", sp("remarks"), { term: tid, students: items.length });
+}

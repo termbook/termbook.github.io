@@ -10,6 +10,8 @@ export const DEFAULT_SUBJECTS_BY_LEVEL = {
 const JSS_ONLY = new Set(["English Studies", "Basic Science", "Basic Technology", "Social Studies", "Business Studies", "Home Economics", "Cultural and Creative Arts"]);
 const SS_ONLY = new Set(["Further Mathematics", "Biology", "Chemistry", "Physics", "Economics", "Government", "Literature in English", "Geography", "History", "Accounting", "Commerce", "Financial Accounting"]);
 
+/** The arms of a class. A class with no arms is one unnamed stream, written as an empty arm. */
+export const armsOf = (c) => (c?.arms?.length ? c.arms : [""]);
 export const levelOf = (className) => (String(className).toUpperCase().startsWith("JSS") ? "JSS" : "SS");
 
 export function subjectsByLevel(structure) {

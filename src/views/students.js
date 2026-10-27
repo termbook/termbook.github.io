@@ -4,7 +4,9 @@ import { watchStudents, addStudent, addStudents, updateStudent, bulkStudentActio
 import { STATUS, LEFT_REASONS, classKey, promotionTarget, findDuplicates, filterStudents, parseStudentRows, parseStudentTable, readStudentFile, TEMPLATE_HEADERS, makeAdmissionNo, makeAccessCode, normName } from "../lib/students.js";
 import { input, select, classPicker, allArms, classLabel, friendlyAuthError, loadNg } from "./common.js";
 import { FIELDS, fieldByKey, splitExtra } from "../lib/studentFields.js";
-import { showDate, parseShown, validPhone } from "../lib/dates.js";
+import { armsOf } from "../lib/structure.js";
+import { showDate, validPhone } from "../lib/dates.js";
+import { dateSelect } from "../lib/datepick.js";
 import { autoParent } from "../lib/attendance.js";
 
 const PAGE = 50;
@@ -23,7 +25,7 @@ export function studentsView(host) {
   const search = h("input", { type: "search", placeholder: "Search by name or admission number", "aria-label": "Search students", value: ui.q, oninput: (e) => { ui.q = e.target.value; ui.page = 0; clearTimeout(search.t); search.t = setTimeout(drawList, 150); } });
   const clsSel = select([["", "All classes"], ...structure.classes.map((c) => [c.name, c.name])], ui.cls, { "aria-label": "Class", onchange: (e) => { ui.cls = e.target.value; ui.arm = ""; ui.page = 0; fillArms(); drawList(); } });
   const armSel = select([["", "All arms"]], "", { "aria-label": "Arm or section", onchange: (e) => { ui.arm = e.target.value; ui.page = 0; drawList(); } });
-  const fillArms = () => { const arms = ui.cls ? structure.classes.find((c) => c.name === ui.cls)?.arms || [] : [...new Set(structure.classes.flatMap((c) => c.arms))]; armSel.replaceChildren(...[["", "All arms"], ...arms.map((a) => [a, a])].map(([v2, l]) => h("option", { value: v2, selected: v2 === ui.arm }, l))); };
+  const fillArms = () => { const arms = ui.cls ? (structure.classes.find((c) => c.name === ui.cls)?.arms || []) : [...new Set(structure.classes.flatMap((c) => c.arms || []))]; armSel.replaceChildren(...[["", "All arms"], ...arms.map((a) => [a, a])].map(([v2, l]) => h("option", { value: v2, selected: v2 === ui.arm }, l))); };
   const statusSel = select([["active", "Active"]], ui.status, { "aria-label": "Status", onchange: (e) => { ui.status = e.target.value; ui.page = 0; drawList(); } });
   const delChk = h("input", { type: "checkbox", onchange: (e) => { ui.deleted = e.target.checked; ui.sel.clear(); drawList(); } });
   const listHost = h("div", {}); fillArms();
@@ -91,14 +93,14 @@ export function studentsView(host) {
   }
 
   function editDialog(s) {
-    const isNew = !s; const keyDefault = ui.cls ? classKey(ui.cls, structure.classes.find((c) => c.name === ui.cls)?.arms[0]) : "";
+    const isNew = !s; const keyDefault = ui.cls ? classKey(ui.cls, armsOf(structure.classes.find((c) => c.name === ui.cls))[0]) : "";
     const mine = isNew || isAdmin || s.classKey === addKeys; // class teachers edit only their own class
     const showPrivate = isAdmin || (isNew ? Boolean(addKeys) : s.classKey === addKeys);
     const controls = []; const track = (el) => (controls.push(el), el);
     const name = track(input({ id: "n", value: s?.name || "" })); const gender = track(select([["M", "Male"], ["F", "Female"]], s?.gender || "M"));
     const adm = input({ id: "a", value: s?.admissionNo || "", disabled: !mine, placeholder: isNew ? "Leave blank to generate one" : "" });
     const cp = addKeys ? h("input", { value: classLabel(addKeys), disabled: true, id: "cp" }) : track(classPicker(structure, s?.classKey || keyDefault));
-    const rep = track(h("input", { type: "checkbox", checked: Boolean(s?.repeater) })); const dob = track(input({ id: "d", placeholder: "DD/MM/YYYY", value: showDate(s?.dob) }));
+    const rep = track(h("input", { type: "checkbox", checked: Boolean(s?.repeater) })); const yr = new Date().getFullYear(); const dob = track(dateSelect({ id: "d", label: "Date of birth", value: s?.dob || "", from: yr - 30, to: yr - 2 }));
     const statusSel = isAdmin && !isNew ? track(select(Object.entries(STATUS), s.status)) : null;
     const relOn = track(h("input", { type: "checkbox" })); const rel = track(select(["", "Christianity", "Islam", "Traditional", "Other", "Prefer not to say"], "")); rel.hidden = true; relOn.addEventListener("change", () => (rel.hidden = !relOn.checked));
     // Every other detail comes from the shared field list, so the form and the template always match.
@@ -109,13 +111,15 @@ export function studentsView(host) {
       const id = "f_" + f.key; let el;
       if (f.type === "textarea") el = h("textarea", { id, rows: 2 });
       else if (f.type === "select") el = select([["", "Not given"], ...f.options.map((o) => [o, o])], "", { id });
+      else if (f.key === "category") el = select([["", "None"], ...(structure.departments || []).map((x) => [x, x])], "", { id });
       else if (f.type === "state") el = select([["", "Choose state"]], "", { id, onchange: () => fillLga("") });
       else if (f.type === "lga") el = select([["", "Choose state first"]], "", { id });
-      else el = input({ id, type: f.type === "tel" ? "tel" : f.type === "email" ? "email" : "text", placeholder: f.type === "date" ? "DD/MM/YYYY" : f.type === "tel" ? "08031234567" : "", inputmode: f.type === "tel" ? "tel" : null });
+      else if (f.type === "date") el = dateSelect({ id, label: f.label, from: new Date().getFullYear() - 12, to: new Date().getFullYear() + 1 });
+      else el = input({ id, type: f.type === "tel" ? "tel" : f.type === "email" ? "email" : "text", placeholder: f.type === "tel" ? "08031234567" : "", inputmode: f.type === "tel" ? "tel" : null });
       inputs[f.key] = track(el);
     }
     loadNg().then((list) => { ng = list; stateSel().replaceChildren(...[["", "Choose state"], ...ng.map((x) => [x.name, x.name])].map(([v2, t]) => h("option", { value: v2, selected: v2 === stateSel().dataset.v }, t))); fillLga(lgaSel().dataset.v || ""); });
-    const setVal = (key, val) => { const el = inputs[key]; if (!el) return; const f = fieldByKey(key); const v2 = f.type === "date" ? showDate(val) : val || ""; el.value = v2; if (f.type === "state" || f.type === "lga") el.dataset.v = v2; };
+    const setVal = (key, val) => { const el = inputs[key]; if (!el) return; const f = fieldByKey(key); const v2 = val || ""; if (key === "category" && v2 && ![...el.options].some((o) => o.value === v2)) el.append(h("option", { value: v2 }, v2)); el.value = v2; if (f.type === "state" || f.type === "lga") el.dataset.v = v2; };
     if (s) { setVal("admissionDate", s.admissionDate); setVal("parentName", s.parentName); }
     if (s && showPrivate) loadPrivate(s.id).then((p) => { for (const f of FIELDS) if (f.store === "private") setVal(f.key, p[f.key]); if (p.religion) { relOn.checked = true; rel.hidden = false; rel.value = p.religion; } if (ng.length) { stateSel().value = p.stateOfOrigin || ""; fillLga(p.lgaOfOrigin || ""); } });
     if (isNew) setVal("nationality", "Nigerian");
@@ -139,19 +143,19 @@ export function studentsView(host) {
       e.preventDefault(); out.hidden = true; const nm = normName(name.value); const key = addKeys || cp.value;
       const fail = (t) => { out.textContent = t; out.className = "form-msg error"; out.hidden = false; out.scrollIntoView({ block: "nearest" }); };
       if (!nm) return fail("Enter the student's name (surname first)."); if (!key) return fail("Choose a class and arm.");
-      if (dob.value && !parseShown(dob.value)) return fail("Date of birth must be DD/MM/YYYY.");
+      if (dob.partial) return fail("Choose the day, month and year of the date of birth, or clear all three.");
       if (!isNew && mine) { const nn = adm.value.trim(); if (!nn) return fail("The admission number cannot be empty."); if (nn !== s.admissionNo && all.some((x) => x.id !== s.id && x.admissionNo === nn)) return fail("Another student already has that admission number."); }
       const stuExtra = {}, priv = {};
       for (const f of FIELDS) {
         const raw = String(inputs[f.key].value || "").trim(); let val = raw;
         if (raw && f.type === "tel") { if (!validPhone(raw)) return fail(`${f.label}: enter a valid Nigerian phone number.`); val = raw.replace(/[\s-]/g, ""); }
         if (raw && f.type === "email" && !/^\S+@\S+\.\S+$/.test(raw)) return fail(`${f.label}: enter a valid email address.`);
-        if (raw && f.type === "date") { val = parseShown(raw); if (!val) return fail(`${f.label} must be DD/MM/YYYY.`); }
+        if (f.type === "date" && inputs[f.key].partial) return fail(`${f.label}: choose the day, month and year, or clear all three.`);
         if (f.store === "student") stuExtra[f.key] = val; else if (showPrivate) priv[f.key] = val;
       }
       if (showPrivate) priv.religion = relOn.checked ? rel.value : "";
       const [c, a] = key.split("|"); const taken = new Set(all.map((x) => x.admissionNo)); const admNo = adm.value.trim() || s?.admissionNo || makeAdmissionNo(taken);
-      const rec = { name: nm, gender: gender.value, class: c, arm: a, repeater: rep.checked, dob: parseShown(dob.value), ...stuExtra };
+      const rec = { name: nm, gender: gender.value, class: c, arm: a, repeater: rep.checked, dob: dob.value, ...stuExtra };
       try {
         if (isNew) {
           const dups = findDuplicates(all, { ...rec, admissionNo: admNo, classKey: key });
@@ -199,16 +203,16 @@ export function studentsView(host) {
       mount(info, h("p", {}, h("strong", {}, `${name}: ${r.length} student${r.length === 1 ? "" : "s"} found`), withDetails ? ` · ${withDetails} with family, health or other details` : ""), problems.length ? h("ul", {}, problems.map((x) => h("li", {}, x))) : h("p", { class: "muted" }, "Everything in the file was read correctly."),
         h("button", { class: "btn btn-sm", type: "button", onclick: () => { fileRows = null; file.value = ""; info.hidden = true; } }, "Remove file")); info.hidden = false;
     }
-    const validKey = (c, a) => structure.classes.some((x) => x.name === c && x.arms.includes(a)) ? classKey(c, a) : "";
+    const validKey = (c, a) => structure.classes.some((x) => x.name === c && armsOf(x).includes(a || "")) ? classKey(c, a || "") : "";
     formDialog("Add many students", (close) => h("form", { novalidate: true, onsubmit: async (e) => {
       e.preventDefault(); out.hidden = true; const rows = rowsNow(); if (!rows.length) return fail("Choose a file or type at least one name.");
       const dlg = addKeys || cp.value; const taken = new Set(all.map((x) => x.admissionNo)); const list = [], skipped = [], wrongClass = [];
       for (const r of rows) {
-        const key = (r.class && r.arm ? validKey(r.class, r.arm) : "") || dlg;
+        const key = (r.class ? validKey(r.class, r.arm) : "") || dlg;
         if (!key) { wrongClass.push(r.name); continue; } if (addKeys && key !== addKeys) { wrongClass.push(r.name); continue; }
         if (r.admissionNo && taken.has(r.admissionNo)) { skipped.push(r.name); continue; }
         const adm = r.admissionNo || makeAdmissionNo(taken); taken.add(adm); const [c, a] = key.split("|");
-        const { student: stuX, priv: privX } = splitExtra(r.extra || {});
+        const { student: stuX, priv: privX } = splitExtra(r.extra || {}); if (stuX.category) stuX.category = (structure.departments || []).find((d) => d.toLowerCase() === stuX.category.toLowerCase()) || stuX.category;
         list.push({ name: r.name, gender: r.gender || "M", repeater: Boolean(r.repeater), admissionNo: adm, class: c, arm: a, status: isAdmin ? "active" : "pending", dob: r.dob || "", parentName: "", ...stuX, _priv: privX });
       }
       if (!list.length) return fail(wrongClass.length ? "No students could be placed. Choose a class and arm, or check the Class and Arm columns." : "Nothing to add.");

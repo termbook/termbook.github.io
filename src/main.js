@@ -24,8 +24,10 @@ const NAV = {
 const $ = (s) => document.querySelector(s); const view = $("#view"), shell = $("#shell");
 const svg = (d) => { const s = document.createElementNS("http://www.w3.org/2000/svg", "svg"); s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("aria-hidden", "true"); const p = document.createElementNS("http://www.w3.org/2000/svg", "path"); p.setAttribute("d", d); s.append(p); return s; };
 function navRole() { return state.isOwner && state.schoolId ? "admin" : roleOf(); }
+// Subject teachers do not see Reports; report cards belong to the class teacher of the class.
+const navItems = (role) => (role === "teacher" && !state.profile?.classTeacherKey ? NAV.teacher.filter((n) => n[1] !== "Reports") : NAV[role] || []);
 function buildNav() {
-  const items = NAV[navRole()] || []; const tabs = items.slice(0, 5); const more = items.length > 5;
+  const items = navItems(navRole()); const tabs = items.slice(0, 5); const more = items.length > 5;
   for (const [host, list] of [[$("#side-nav"), items], [$("#tab-nav"), more ? tabs.slice(0, 4) : tabs]]) { host.replaceChildren(...list.map(([href, label, ic]) => h("a", { href }, svg(ICONS[ic]), label))); }
   if (more) $("#tab-nav").append(h("a", { href: "#/more" }, svg(ICONS.gear), "More"));
   if (state.isOwner && state.schoolId) $("#side-nav").prepend(h("a", { href: "#/owner/schools", onclick: () => { state.schoolId = null; state.school = null; buildNav(); } }, svg(ICONS.school), "All schools"));
@@ -37,7 +39,7 @@ async function route() {
   stopAll(); const full = location.hash || "#/login"; const [, a, b, c] = full.split("/"); const path = `#/${a || ""}${b ? "/" + b : ""}`;
   if (!state.user) { setBare(true); document.title = APP_NAME; return mount(view, a === "register" ? authView("register") : a === "forgot" ? forgotView() : authView("login")); }
   if (!state.profile && !state.isOwner) return; // onboarding handled by boot
-  const role = navRole(); const items = NAV[role];
+  const role = navRole(); const items = navItems(role);
   if (full === "#/more") return mount(view, h("h1", {}, "More"), h("div", { class: "list" }, items.map(([href, label]) => h("a", { class: "row-card", href }, label))));
   if (!items.some((n) => n[0] === path)) { location.hash = items[0][0]; return; }
   $("#school-name").textContent = state.school?.name || (state.isOwner ? "Platform owner" : "");
@@ -73,7 +75,7 @@ async function boot() {
       if ((p.role === "admin" || p.role === "teacher") && p.schoolId) state.school = await loadSchool(p.schoolId);
       if (p.role === "teacher" && state.school?.status === "pending") state.school.banner = true;
     } catch (e) { setBare(true); return mount(view, empty("Cannot load your account", e?.message || "Check your connection and try again.")); }
-    setBare(false); buildNav(); if (!location.hash || /^#\/(login|register|forgot)/.test(location.hash)) location.hash = NAV[navRole()][0][0]; route();
+    setBare(false); buildNav(); if (!location.hash || /^#\/(login|register|forgot)/.test(location.hash)) location.hash = navItems(navRole())[0][0]; route();
   });
 }
 boot();

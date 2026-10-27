@@ -11,12 +11,14 @@ export const SELECTS = {
   genotype: ["AA", "AS", "SS", "AC", "SC", "Unknown"],
   transport: ["Walks", "School bus", "Driven by parent", "Public transport", "Other"],
   boarding: ["Day", "Boarding"],
+  emergencyRelationship: ["Father", "Mother", "Brother", "Sister", "Uncle", "Aunt", "Grandparent", "Guardian", "Neighbour", "Family friend", "Other"],
 };
 
 // group, key, label (also the template heading), type, store, extra aliases (normalised: lower case, letters and digits only)
 const F = (group, key, label, type, store, aliases = [], options) => ({ group, key, label, type, store, aliases, options });
 export const FIELDS = [
   F("student", "admissionDate", "Admission date", "date", "student", ["dateofadmission", "admitted"]),
+  F("student", "category", "Class category (section)", "text", "student", ["category", "section", "department", "classcategory", "stream"]),
   F("student", "stateOfOrigin", "State of origin", "state", "private", ["state"]),
   F("student", "lgaOfOrigin", "LGA of origin", "lga", "private", ["lga", "localgovernment", "localgovernmentofarea"]),
   F("student", "nationality", "Nationality", "text", "private"),
@@ -33,7 +35,7 @@ export const FIELDS = [
   F("family", "motherPhone", "Mother's phone", "tel", "private", ["motherphone"]),
   F("family", "motherOccupation", "Mother's occupation", "text", "private", ["motheroccupation"]),
   F("emergency", "emergencyName", "Emergency contact name", "text", "private", ["emergencycontact", "emergencyname"]),
-  F("emergency", "emergencyRelationship", "Emergency contact relationship", "text", "private", ["emergencyrelationship"]),
+  F("emergency", "emergencyRelationship", "Emergency contact relationship", "select", "private", ["emergencyrelationship"], SELECTS.emergencyRelationship),
   F("emergency", "emergencyPhone", "Emergency contact phone", "tel", "private", ["emergencyphone"]),
   F("health", "bloodGroup", "Blood group", "select", "private", ["bloodtype"], SELECTS.bloodGroup),
   F("health", "genotype", "Genotype", "select", "private", [], SELECTS.genotype),

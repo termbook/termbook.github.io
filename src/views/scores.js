@@ -5,7 +5,7 @@ import { isEnrolled, classKey } from "../lib/students.js";
 import { calc, annual, rankOf, termStats, grade, ord, LBL, sheetRows, groups, students } from "../lib/scores.js";
 import { toSheetModel } from "../lib/reports.js";
 import { select, classLabel, friendlyAuthError } from "./common.js";
-import { subjectsForClass } from "../lib/structure.js";
+import { subjectsForClass, armsOf } from "../lib/structure.js";
 
 let unsub = null; export const stopScores = () => { unsub?.(); unsub = null; };
 const FIELDS = [["a", "1st CA", "a"], ["b", "2nd CA", "b"], ["c", "Open day", "c"], ["e", "Exam", "e"]]; const BONUS = [["at", "Attendance"], ["tb", "Textbook"], ["nb", "Notebook"]];
@@ -23,7 +23,7 @@ export function printNodes(nodes) { let a = document.getElementById("print-area"
 export async function scoresView(host) {
   stopScores(); const s = state.school, admin = roleOf() === "owner" || roleOf() === "admin"; const w = s.scoring.weights, grades = s.scoring.grades, session = s.current.session;
   let options = [];
-  if (admin) options = s.structure.classes.flatMap((c) => c.arms.flatMap((a) => subjectsForClass(s.structure, c.name).map((sub) => ({ subject: sub, key: classKey(c.name, a) }))));
+  if (admin) options = s.structure.classes.flatMap((c) => armsOf(c).flatMap((a) => subjectsForClass(s.structure, c.name).map((sub) => ({ subject: sub, key: classKey(c.name, a) }))));
   else options = (state.profile.assignmentsList || []).map((a) => ({ subject: a.subject, key: classKey(a.class, a.arm) }));
   if (!options.length) return mount(host, h("h1", {}, "Scores"), empty("No subjects assigned", "Your school admin has not given you a subject and class yet."));
   const stored = localStorage.getItem("tb-sheet"); let cur = options.find((o) => `${o.subject}@@${o.key}` === stored) || options[0];

@@ -1,6 +1,6 @@
 import { h, field } from "../lib/dom.js";
 import { classKey, splitKey } from "../lib/students.js";
-import { allSubjects, classesForSubject } from "../lib/structure.js";
+import { allSubjects, classesForSubject, armsOf } from "../lib/structure.js";
 
 let ngCache;
 export async function loadNg() { if (!ngCache) ngCache = (await (await fetch("/data/ng-states-lgas.json")).json()).states; return ngCache; }
@@ -10,7 +10,7 @@ export function select(options, value, props = {}) {
   const s = h("select", props, options.map((o) => { const [v, l] = Array.isArray(o) ? o : [o, o]; return h("option", { value: v, selected: v === value }, l); }));
   return s;
 }
-export const allArms = (structure) => structure.classes.flatMap((c) => c.arms.map((a) => ({ cls: c.name, arm: a, key: classKey(c.name, a) })));
+export const allArms = (structure) => structure.classes.flatMap((c) => armsOf(c).map((a) => ({ cls: c.name, arm: a, key: classKey(c.name, a) })));
 export const classLabel = (k) => String(k).replace("|", "");
 
 /** Class + arm dropdown from the school's own list. */
@@ -34,8 +34,8 @@ export function rolePicker(structure, init = {}) {
     const classes = classesForSubject(structure, sub); const count = h("span", { class: "hint" });
     counts.set(sub, count);
     const rows = classes.map((c) => {
-      const arms = c.arms.map((a) => { const k = classKey(c.name, a); const x = check(`${a}`, pairs.has(`${sub}@@${k}`), (e) => { e.target.checked ? pairs.add(`${sub}@@${k}`) : pairs.delete(`${sub}@@${k}`); syncAll(); refresh(sub); }); boxes.set(`${sub}@@${k}`, x.i); return x; });
-      const all = check("All", arms.every((x) => x.i.checked), (e) => { c.arms.forEach((a, i) => { const k = `${sub}@@${classKey(c.name, a)}`; arms[i].i.checked = e.target.checked; e.target.checked ? pairs.add(k) : pairs.delete(k); }); refresh(sub); });
+      const arms = armsOf(c).map((a) => { const k = classKey(c.name, a); const x = check(a || "Whole class", pairs.has(`${sub}@@${k}`), (e) => { e.target.checked ? pairs.add(`${sub}@@${k}`) : pairs.delete(`${sub}@@${k}`); syncAll(); refresh(sub); }); boxes.set(`${sub}@@${k}`, x.i); return x; });
+      const all = check("All", arms.every((x) => x.i.checked), (e) => { armsOf(c).forEach((a, i) => { const k = `${sub}@@${classKey(c.name, a)}`; arms[i].i.checked = e.target.checked; e.target.checked ? pairs.add(k) : pairs.delete(k); }); refresh(sub); });
       const syncAll = () => { all.i.checked = arms.every((x) => x.i.checked); };
       return h("div", { class: "cls-row" }, h("strong", {}, c.name), all.el, h("div", { class: "arm-list" }, arms.map((x) => x.el)));
     });
@@ -45,7 +45,7 @@ export function rolePicker(structure, init = {}) {
   });
   // Pairs that were saved earlier but are not offered by the school's current lists (for example Basic Science in SS2).
   // They are shown ticked so they can be unticked; before this, they stayed hidden and could not be removed.
-  const offered = new Set(subjects.flatMap((sub) => classesForSubject(structure, sub).flatMap((c) => c.arms.map((a) => `${sub}@@${classKey(c.name, a)}`))));
+  const offered = new Set(subjects.flatMap((sub) => classesForSubject(structure, sub).flatMap((c) => armsOf(c).map((a) => `${sub}@@${classKey(c.name, a)}`))));
   const orphans = [...pairs].filter((p) => !offered.has(p));
   const orphanBox = orphans.length ? h("fieldset", { class: "fs fs-warn" }, h("legend", {}, "Not offered in that class"),
     h("p", { class: "hint" }, "These were selected earlier, but the school does not teach the subject in that class. Untick any that are wrong."),

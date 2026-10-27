@@ -105,3 +105,29 @@ textarea{min-height:5rem}.fileinfo{background:var(--surface-2);border-radius:var
 @media (prefers-reduced-motion:reduce){.kpi-fill,.srow{transition:none}}
 .sname strong{display:block;line-height:1.25}.sname .linkbtn{min-height:28px;font-size:var(--step--1)}
 @media (min-width:900px){.sc input{min-height:40px;font-size:1rem}.stot{gap:var(--space-2)}.tot{font-size:1.2rem;min-width:2.2rem;text-align:right}}
+
+/* ---- Student report card (Oyo State layout) ---- */
+.rc-scroll{overflow-x:auto;margin:var(--space-3) 0}
+.rc{--gold:#7a5a00;--grey:#d9d9d9;--green:#0a7a2f;background:#fff;color:#000;width:194mm;min-width:194mm;margin:0 auto;font:8.5pt/1.25 Calibri,"Segoe UI",Arial,sans-serif}
+.rc *{box-sizing:border-box}.rc-t{width:100%;border-collapse:collapse;table-layout:fixed;margin:0}.rc-t td,.rc-t th{border:1px solid #000;padding:1.2mm 1.5mm;vertical-align:middle;overflow-wrap:anywhere}
+.rc-head .rc-logocell{width:19%;text-align:center;padding:1mm}.rc-logo{max-width:100%;max-height:22mm;object-fit:contain}.rc-title{text-align:center;font-weight:800;font-size:13pt;padding:1.5mm}.rc-sub{text-align:center;font-weight:800;color:var(--gold);font-size:9.5pt}
+.rc-strip{padding:0!important}.rc-inner td{border:0;border-right:1px solid #000;padding:1.2mm 1.5mm}.rc-inner td:last-child{border-right:0}
+.rc-gold{color:var(--gold)}.rc-ul{text-decoration:underline}.rc-b{font-weight:800}.rc-c{text-align:center}.rc-sm{font-size:7.5pt}.rc-big{font-size:10pt;font-weight:800}.rc-faint{color:#555;font-size:7pt}
+.rc-lab{background:var(--grey);font-weight:800;text-align:center}.rc-val{color:var(--gold);font-weight:800;text-align:center}
+.rc-g24 colgroup,.rc-g24{table-layout:fixed}.rc-g24 td{font-size:8pt}
+.rc-bar{border:1px solid #000;border-top:0;text-align:center;font-weight:800;font-size:10pt;padding:.8mm}
+.rc-cog th{background:var(--grey);font-size:7.5pt;text-align:center;font-weight:800;padding:1mm}.rc-pct{font-weight:800;border-top:1px solid #000;margin-top:.5mm;padding-top:.5mm}
+.rc-cog td{padding:.45mm 1.2mm;font-size:8pt}.rc-cog tr.na td{color:#444}.rc-tot td{padding:1.2mm}
+.rc-cog:not(.rc-final) td:nth-child(1),.rc-cog:not(.rc-final) th:nth-child(1){width:5%}.rc-cog:not(.rc-final) td:nth-child(2),.rc-cog:not(.rc-final) th:nth-child(2){width:24%}
+.rc-final td:nth-child(1),.rc-final th:nth-child(1){width:4%}.rc-final td:nth-child(2),.rc-final th:nth-child(2){width:21%}.rc-final td:nth-child(11),.rc-final th:nth-child(11){width:12%}
+.rc-key{border:1px solid #000;border-top:0;text-align:center;padding:1mm;font-size:7.5pt;display:flex;flex-wrap:wrap;justify-content:center;gap:0 8mm}.rc-green{color:var(--green);font-weight:800}
+.rc-dom th.rc-trait{font-size:6.8pt;font-weight:800;text-align:center;padding:1mm .6mm;background:#fff}.rc-dom.n8 td:nth-last-child(2),.rc-dom.n8 th:nth-last-child(2){width:12%}.rc-dom td{font-size:7pt}
+.rc-cm td{height:8mm}.rc-cm td:nth-child(1),.rc-cm td:nth-child(3){width:15%}.rc-cm td:nth-child(2){width:48%}.rc-sign{max-height:14mm;max-width:60mm;object-fit:contain}
+.rc-foot td{height:11mm}.rc-next{font-size:11pt;width:55%}.rc-credit{font-size:6.8pt;font-weight:800;text-align:center}.rc-mini{max-height:9mm}
+.rc.dense{font-size:7.5pt}.rc.dense .rc-cog td{padding:.2mm 1mm;font-size:7pt}.rc.dense .rc-t td,.rc.dense .rc-t th{padding:.6mm 1mm}
+.setup-logo{max-height:90px;margin:var(--space-2) 0}.setup-sign{max-height:60px;background:#fff;border:1px solid var(--border);margin:var(--space-2) 0}
+@page{size:A4;margin:8mm}
+@media print{#print-area .rc{width:194mm;min-width:0;break-after:page;page-break-after:always;margin:0}#print-area .rc:last-child{break-after:auto;page-break-after:auto}.rc *{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+.datesel{display:grid;grid-template-columns:4.5rem minmax(7rem,1fr) 5.5rem;gap:var(--space-2)}.datesel select{min-width:0;padding-inline:var(--space-2)}
+@media (max-width:420px){.datesel{grid-template-columns:4rem 1fr 5rem}}
+.grow{flex:1;min-width:0}

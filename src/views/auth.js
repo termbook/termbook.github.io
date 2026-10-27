@@ -3,7 +3,8 @@ import { auth } from "../lib/firebase.js";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, sendEmailVerification, sendPasswordResetEmail, signOut } from "firebase/auth";
 import { input, select, msg, busy, friendlyAuthError, loadNg, rolePicker } from "./common.js";
 import { registerAdmin, registerTeacher, registerParent, publicSchools, DEFAULT_STRUCTURE } from "../lib/data.js";
-import { parseShown, validPhone } from "../lib/dates.js";
+import { validPhone } from "../lib/dates.js";
+import { dateSelect } from "../lib/datepick.js";
 
 const CONSENT_VERSION = "draft-1";
 const card = (...k) => h("div", { class: "card authcard" }, ...k);
@@ -70,13 +71,13 @@ export function onboardingView(user, onDone) {
       h("button", { class: "btn", type: "button", onclick: () => parentForm() }, "I am a parent or student"),
       h("button", { class: "btn btn-quiet", type: "button", onclick: () => signOut(auth) }, "Log out"))));
   const personal = (nameHint = "Surname first, e.g. ADEBAYO Temitope") => {
-    const name = input({ id: "pn", placeholder: nameHint, autocomplete: "name" }); const phone = input({ id: "pp", type: "tel", placeholder: "08031234567 or +2348031234567", autocomplete: "tel" }); const dob = input({ id: "pd", placeholder: "DD/MM/YYYY", inputmode: "numeric" });
+    const name = input({ id: "pn", placeholder: nameHint, autocomplete: "name" }); const phone = input({ id: "pp", type: "tel", placeholder: "08031234567 or +2348031234567", autocomplete: "tel" }); const dob = dateSelect({ id: "pd", label: "Date of birth", from: new Date().getFullYear() - 80, to: new Date().getFullYear() - 16 });
     return { name, phone, dob, el: [field("Full name (surname first)", name), field("Phone number", phone), field("Date of birth", dob)] };
   };
   const checkPersonal = (p, out) => {
     if (!p.name.value.trim()) return msg(out, "Enter your full name."), null;
     if (!validPhone(p.phone.value)) return msg(out, "Enter a valid Nigerian phone number."), null;
-    const dob = parseShown(p.dob.value); if (!dob) return msg(out, "Enter your date of birth as DD/MM/YYYY."), null;
+    const dob = p.dob.value; if (!dob) return msg(out, p.dob.partial ? "Choose the day, month and year of your date of birth." : "Choose your date of birth."), null;
     if (!document.getElementById("consent").checked) return msg(out, "Please tick the consent box to continue."), null;
     return { name: p.name.value.trim(), phone: p.phone.value.replace(/[\s-]/g, ""), dob };
   };

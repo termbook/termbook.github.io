@@ -30,10 +30,10 @@ service cloud.firestore {
     match /publicSchools/{sid} {
       allow read: if true;
       allow create: if isOwner() || (isAdmin(sid) && !requireVerification()
-        && request.resource.data.keys().hasOnly(['name', 'state', 'lga', 'structure']));
+        && request.resource.data.keys().hasOnly(['name', 'state', 'lga', 'structure', 'branding']));
       allow update: if isOwner() || (isAdmin(sid)
         && get(/databases/$(db)/documents/schools/$(sid)).data.status == 'verified'
-        && request.resource.data.keys().hasOnly(['name', 'state', 'lga', 'structure'])
+        && request.resource.data.keys().hasOnly(['name', 'state', 'lga', 'structure', 'branding'])
         && request.resource.data.state == resource.data.state && request.resource.data.lga == resource.data.lga);
       allow delete: if isOwner();
     }
@@ -76,7 +76,7 @@ service cloud.firestore {
       allow update: if isOwner()
         || (isAdmin(sid)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-                 ['name', 'type', 'address', 'phone', 'email', 'structure', 'scoring', 'current', 'settings']));
+                 ['name', 'type', 'address', 'phone', 'email', 'structure', 'scoring', 'current', 'settings', 'report', 'branding']));
       allow delete: if false;
 
       match /students/{id} {
@@ -153,6 +153,19 @@ service cloud.firestore {
         allow update: if teachesSubject(sid, resource.data.subject, resource.data.classKey)
           && request.resource.data.subject == resource.data.subject
           && request.resource.data.classKey == resource.data.classKey;
+        allow delete: if isOwner() || isAdmin(sid);
+      }
+
+      // Conduct ratings and comments for report cards. The class teacher fills ratings and the tutor's comment;
+      // only the admin or owner may write the principal's comment.
+      match /remarks/{rid} {
+        allow read: if isClassTeacher(sid, resource.data.classKey);
+        allow create: if isClassTeacher(sid, request.resource.data.classKey)
+          && get(/databases/$(db)/documents/schools/$(sid)/students/$(request.resource.data.studentId)).data.classKey == request.resource.data.classKey
+          && (isOwner() || isAdmin(sid) || !('principalComment' in request.resource.data));
+        allow update: if isClassTeacher(sid, resource.data.classKey) && request.resource.data.classKey == resource.data.classKey
+          && (isOwner() || isAdmin(sid)
+              || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratings', 'tutorComment', 'tutorName', 'updatedAt', 'updatedBy']));
         allow delete: if isOwner() || isAdmin(sid);
       }
 

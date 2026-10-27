@@ -1,3 +1,4 @@
+import { armsOf } from "./structure.js";
 import { fieldForHeader, fieldByKey, optionMatch, TEMPLATE_HEADERS } from "./studentFields.js";
 /** Student rules: class order, promotion, status, duplicates and codes. Pure functions, covered by tests. */
 export const CLASS_ORDER = ["JSS1", "JSS2", "JSS3", "SS1", "SS2", "SS3"];
@@ -13,9 +14,9 @@ export function promotionTarget(student, structure) {
   const to = nextClass(student.class);
   if (!to) return null;
   if (to === "GRADUATED") return { graduate: true };
-  const arms = structure.classes.find((c) => c.name === to)?.arms || [];
-  const arm = arms.includes(student.arm) ? student.arm : arms[0];
-  return arm ? { class: to, arm, classKey: classKey(to, arm) } : null;
+  const arms = armsOf(structure.classes.find((c) => c.name === to));
+  const arm = arms.includes(student.arm || "") ? (student.arm || "") : arms[0];
+  return structure.classes.some((c) => c.name === to) ? { class: to, arm, classKey: classKey(to, arm) } : null;
 }
 
 export function findDuplicates(existing, cand) {

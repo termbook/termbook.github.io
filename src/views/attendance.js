@@ -4,7 +4,8 @@ import { watchStudents, watchAttendance, saveAttendanceDay, watchHolidays, addHo
 import { classPicker, classLabel, input, select, friendlyAuthError } from "./common.js";
 import { isEnrolled } from "../lib/students.js";
 import { SESSIONS, dstr, parseD, addDays, todayStr, weekDates, currentWeekIndex, weekSummary, termSummary, sortStudents, dayPoints, isWeekend } from "../lib/attendance.js";
-import { showDate, showLong, parseShown } from "../lib/dates.js";
+import { showDate, showLong } from "../lib/dates.js";
+import { dateSelect } from "../lib/datepick.js";
 
 let subs = [];
 export function stopAttendance() { subs.forEach((f) => f?.()); subs = []; }
@@ -60,7 +61,7 @@ export async function attendanceView(host, tab = "register") {
     const q = ui.q.toLowerCase(); const row = (x, i) => h("div", { class: "reg-row" }, h("span", { class: "reg-name" }, h("span", { class: "avatar", "aria-hidden": "true" }, initials(x.name)), `${i + 1}. ${x.name}`),
       [AM, PM].map((sess) => h("label", { class: "sw" }, h("span", { class: "sr" }, `${x.name} ${sess === AM ? "AM" : "PM"}`), h("input", { type: "checkbox", checked: Boolean(day[x.id]?.[sess]), disabled: Boolean(hol) || weekend, onchange: (e) => { setMark(d, x.id, sess, e.target.checked); draw(); } }), h("i", {}))));
     const grp = (g, title) => { const l = st.filter((x) => x.gender === g); const vis = l.filter((x) => !q || x.name.toLowerCase().includes(q)); return l.length ? [h("h2", {}, title, h("span", { class: "count" }, l.length)), h("div", { class: "reg-list" }, vis.map((x) => row(x, l.indexOf(x))))] : null; };
-    const dateIn = input({ value: showDate(d), "aria-label": "Date (DD/MM/YYYY)", inputmode: "numeric" }); dateIn.addEventListener("change", () => { const p = parseShown(dateIn.value); if (p) { ui.date = p; draw(); } else toast("Use DD/MM/YYYY", "error"); });
+    const dateIn = dateSelect({ id: "rd", label: "Register date", value: d, from: new Date().getFullYear() - 1, to: new Date().getFullYear() + 1 }); dateIn.addEventListener("change", () => { if (dateIn.value) { ui.date = dateIn.value; draw(); } });
     const setAll = (sess, v) => { st.forEach((x) => setMark(d, x.id, sess, v)); draw(); };
     mount(body, h("div", { class: "datebar" }, h("button", { class: "btn btn-icon", "aria-label": "Previous day", onclick: () => { ui.date = dstr(addDays(parseD(d), -1)); draw(); } }, "‹"), h("div", { class: "datebox" }, h("div", { class: "muted" }, showLong(d)), dateIn), h("button", { class: "btn btn-icon", "aria-label": "Next day", onclick: () => { ui.date = dstr(addDays(parseD(d), 1)); draw(); } }, "›"), h("button", { class: "btn btn-sm", onclick: () => { ui.date = todayStr(); draw(); } }, "Today")),
       h("p", { class: "muted" }, `Week ${currentWeekIndex(termStart, weeks, d)} of ${weeks} · ${st.length} students · `, h("span", { id: "sync", class: "chip" }, navigator.onLine ? "Synced" : "Offline")),
@@ -93,10 +94,10 @@ export async function attendanceView(host, tab = "register") {
 }
 
 async function holidaysTab(body, admin) {
-  const date = input({ placeholder: "DD/MM/YYYY", "aria-label": "Date" }); const why = input({ placeholder: "Reason (optional)", "aria-label": "Reason" }); let hol = {}; const list = h("div", {});
+  const date = dateSelect({ id: "hd", label: "Holiday date", from: new Date().getFullYear() - 1, to: new Date().getFullYear() + 2, order: "asc" }); const why = input({ placeholder: "Reason (optional)", "aria-label": "Reason" }); let hol = {}; const list = h("div", {});
   const draw = () => mount(list, Object.keys(hol).sort().length ? h("div", { class: "list" }, Object.keys(hol).sort().map((d) => h("div", { class: "row-card" }, h("div", {}, h("strong", {}, showLong(d)), h("div", { class: "hint" }, hol[d].label || "")), admin ? h("button", { class: "btn btn-sm btn-danger-quiet", onclick: () => removeHoliday(d).catch((e) => toast(friendlyAuthError(e), "error")) }, "Remove") : null))) : empty("No holidays", "Holidays are not counted as school days."));
   subs.push(watchHolidays((m) => { hol = m; draw(); }));
   const nat = h("div", {});
   if (admin) nationalHolidays().then((l) => { const todo = l.filter((x) => !hol[x.date]); if (todo.length) mount(nat, h("div", { class: "banner banner-info" }, h("p", {}, `${todo.length} national public holiday(s) published by the platform.`), h("button", { class: "btn btn-sm", onclick: async () => { for (const x of todo) await addHoliday(x.date, x.reason); toast("Added"); } }, "Accept all"))); });
-  mount(body, admin ? h("div", { class: "card" }, h("h2", {}, "Add a holiday"), h("div", { class: "filters" }, date, why, h("button", { class: "btn btn-primary", onclick: async () => { const d = parseShown(date.value); if (!d) return toast("Use DD/MM/YYYY", "error"); try { await addHoliday(d, why.value.trim()); date.value = why.value = ""; } catch (e) { toast(friendlyAuthError(e), "error"); } } }, "Add holiday"))) : null, nat, list);
+  mount(body, admin ? h("div", { class: "card" }, h("h2", {}, "Add a holiday"), h("div", { class: "filters" }, date, why, h("button", { class: "btn btn-primary", onclick: async () => { const d = date.value; if (!d) return toast("Choose the day, month and year", "error"); try { await addHoliday(d, why.value.trim()); date.value = ""; why.value = ""; } catch (e) { toast(friendlyAuthError(e), "error"); } } }, "Add holiday"))) : null, nat, list);
 }

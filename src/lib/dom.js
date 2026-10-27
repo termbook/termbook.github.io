@@ -36,7 +36,7 @@ export function formDialog(title, build, wide = false) {
   d.addEventListener("close", () => d.remove());
   document.body.append(d); d.showModal(); return d;
 }
-export const field = (label, input, hint) => { const id = input.id || (input.id = "f" + Math.random().toString(36).slice(2, 8)); return h("div", { class: "field" }, h("label", { for: id }, label), input, hint ? h("p", { class: "hint" }, hint) : null); };
+export const field = (label, input, hint) => { const id = input.focusId || input.id || (input.id = "f" + Math.random().toString(36).slice(2, 8)); return h("div", { class: "field" }, h("label", { for: id }, label), input, hint ? h("p", { class: "hint" }, hint) : null); };
 export const empty = (title, text, action) => h("div", { class: "empty" }, h("h2", {}, title), h("p", {}, text), action || null);
 export const skeleton = (n = 4) => h("div", { "aria-busy": "true", "aria-label": "Loading" }, Array.from({ length: n }, () => h("div", { class: "skeleton skel-row" })));
 export function downloadCsv(name, rows) {
