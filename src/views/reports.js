@@ -1,6 +1,6 @@
 import { h, mount, toast, empty, skeleton, confirmDialog, formDialog } from "../lib/dom.js";
 import { state, roleOf } from "../lib/store.js";
-import { watchStudents, listSheets, allSheets, publishTerm, setPublished, loadTerm, exportCollection, loadRemarks, termId } from "../lib/data.js";
+import { studentsOnce, listSheets, allSheets, publishTerm, setPublished, loadTerm, exportCollection, loadRemarks, termId } from "../lib/data.js";
 import { isEnrolled } from "../lib/students.js";
 import { buildClassCards, ordinal } from "../lib/reportcard.js";
 import { LBL } from "../lib/scores.js";
@@ -10,7 +10,6 @@ import { printNodes } from "./scores.js";
 import { renderReportCard, remarksDialog, applyTemplatesDialog } from "./reportcard.js";
 
 let unsub; export const stopReports = () => { unsub?.(); unsub = null; };
-const studentsOnce = () => new Promise((res) => { const un = watchStudents((l) => { un(); res(l || []); }); });
 
 /** Opened / present counts per student for one class and term, from the attendance register (two marks per school day). */
 async function attendanceFor(key, session, term, roster, termInfo, holidays) {

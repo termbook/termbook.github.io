@@ -82,6 +82,10 @@ export function buildClassCards({ roster, sheets, term, session, school, nextTer
     });
     const scored = cards.filter((c) => c.counts.offered > 0);
     // Class position: rank by total percentage; equal percentages share a position.
+    // Class averages, so a student (or a parent) can compare with the class without seeing anyone else's marks.
+    const mean = (a) => (a.length ? round1(a.reduce((p, n) => p + n, 0) / a.length) : 0);
+    subjects.forEach((sub, i) => { const avg = mean(cards.map((c) => c.rows[i]).filter((r) => r.offered).map((r) => r.total)); cards.forEach((c) => { c.rows[i].classAvg = avg; }); });
+    const classPct = mean(scored.map((c) => c.totals.percent)); cards.forEach((c) => { c.totals.classPercent = classPct; });
     cards.forEach((c) => { c.counts.position = c.counts.offered ? 1 + scored.filter((o) => o.totals.percent > c.totals.percent).length : 0; });
     out.push(...cards);
   }

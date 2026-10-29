@@ -100,6 +100,8 @@ export function watchStudents(cb) {
 }
 /** Student document ids come from the admission number, so a parent can find the child's record and numbers stay unique. */
 export const studentIdFor = (adm) => String(adm).trim().replace(/[\/\s.#$\[\]]+/g, "-");
+/** Reads the student list once (the live listener is closed after the first answer, even if it answers immediately). */
+export function studentsOnce() { return new Promise((resolve, reject) => { let un = null, done = false; un = watchStudents((list, err) => { if (done) return; done = true; if (un) un(); if (err) reject(err); else resolve(list || []); }); if (done && un) un(); }); }
 export async function addStudent(s, priv) {
   const r = doc(db, sp(`students/${studentIdFor(s.admissionNo)}`));
   if ((await getDoc(r)).exists()) throw new Error("That admission number is already in use.");
@@ -259,7 +261,7 @@ export async function loadRemarks(session, term, key) {
   const s = await getDocs(q); const m = {}; s.docs.forEach((x) => (m[x.data().studentId] = x.data())); return m;
 }
 /** The school's public logos, for parents' report cards. */
-export async function publicSchoolBranding(schoolId) { try { const s = await getDoc(ref(`publicSchools/${schoolId}`)); return s.exists() ? { logo: s.data().branding?.logo || "", stateLogo: s.data().branding?.stateLogo || "" } : {}; } catch { return {}; } }
+export async function publicSchoolBranding(schoolId) { try { const s = await getDoc(ref(`publicSchools/${schoolId}`)); return s.exists() ? { name: s.data().name || "", logo: s.data().branding?.logo || "", stateLogo: s.data().branding?.stateLogo || "" } : {}; } catch { return {}; } }
 
 /** Writes conduct ratings and comments for many students at once. items: [{ student, patch }]. */
 export async function saveRemarksBulk(session, term, items) {
@@ -270,4 +272,36 @@ export async function saveRemarksBulk(session, term, items) {
     await b.commit();
   }
   await audit("report_remarks_bulk", sp("remarks"), { term: tid, students: items.length });
+}
+
+// ---- student attendance records (what a parent sees) and absence notes ----
+export const attRecId = (session, studentId) => `${session.replace("/", "-")}_${studentId}`;
+export const marksMask = (m) => (m && m.morning ? 1 : 0) | (m && m.afternoon ? 2 : 0);
+/** Keeps each changed student's own attendance record in step with the class register. changes: [{ student, mask }] */
+export async function syncStudentAttendance({ session, term, key, date, changes, openDays }) {
+  for (let i = 0; i < changes.length; i += 100) {
+    const b = writeBatch(db);
+    for (const { studentId, mask } of changes.slice(i, i + 100)) b.set(ref(sp(`studentAttendance/${attRecId(session, studentId)}`)), { studentId, classKey: key, session, d: { [date]: mask ? mask : deleteField() }, od: { [term]: openDays }, updatedAt: serverTimestamp() }, { merge: true });
+    await b.commit();
+  }
+}
+export async function loadStudentAttendance(schoolId, session, studentId) { try { const s = await getDoc(doc(db, `schools/${schoolId}/studentAttendance/${attRecId(session, studentId)}`)); return s.exists() ? s.data() : null; } catch { return null; } }
+export async function saveAbsenceNote(schoolId, student, date, reason) { await setDoc(doc(db, `schools/${schoolId}/absenceNotes/${student.id}_${date}`), { studentId: student.id, classKey: student.classKey, date, reason, uid: auth.currentUser.uid, createdAt: serverTimestamp() }); }
+export async function loadMyAbsenceNotes(schoolId, studentId) { try { const s = await getDocs(query(collection(db, `schools/${schoolId}/absenceNotes`), where("uid", "==", auth.currentUser.uid), where("studentId", "==", studentId))); return s.docs.map((x) => ({ id: x.id, ...x.data() })).sort((a, b) => b.date.localeCompare(a.date)); } catch { return []; } }
+export async function deleteAbsenceNote(schoolId, id) { await deleteDoc(doc(db, `schools/${schoolId}/absenceNotes/${id}`)); }
+export function watchAbsenceNotes(key, cb) { return onSnapshot(query(col(sp("absenceNotes")), where("classKey", "==", key)), (s) => { const m = {}; s.docs.forEach((x) => (m[`${x.data().studentId}_${x.data().date}`] = x.data())); cb(m); }, () => cb({})); }
+/** Used by a linked parent to read and edit their own child's private details. */
+export async function loadPrivateFor(schoolId, studentId) { try { const s = await getDoc(doc(db, `schools/${schoolId}/students/${studentId}/private/info`)); return s.exists() ? s.data() : {}; } catch { return {}; } }
+export async function saveParentPrivate(schoolId, studentId, values) { await setDoc(doc(db, `schools/${schoolId}/students/${studentId}/private/info`), { ...values, updatedAt: serverTimestamp(), updatedBy: auth.currentUser.uid, updatedByRole: "parent" }, { merge: true }); }
+/** One-off repair for the admin: rebuilds every student's attendance record for a session from the class registers. */
+export async function rebuildStudentAttendance(session, students, termDays) {
+  const snap = await getDocs(query(col(sp("attendance")), where("session", "==", session)));
+  const per = {}; snap.docs.forEach((x) => { const r = x.data(); Object.entries(r.marks || {}).forEach(([sid, m]) => { const mask = marksMask(m); if (mask) ((per[sid] ||= {})[r.date] = mask); }); });
+  const list = students.filter((s) => !s.deleted); let n = 0;
+  for (let i = 0; i < list.length; i += 100) {
+    const b = writeBatch(db);
+    for (const s of list.slice(i, i + 100)) { b.set(ref(sp(`studentAttendance/${attRecId(session, s.id)}`)), { studentId: s.id, classKey: s.classKey, session, d: per[s.id] || {}, od: termDays, updatedAt: serverTimestamp() }); n++; }
+    await b.commit();
+  }
+  await audit("attendance_rebuilt", sp("studentAttendance"), { students: n }); return n;
 }

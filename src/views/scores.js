@@ -6,6 +6,7 @@ import { calc, annual, rankOf, termStats, grade, ord, LBL, sheetRows, groups, st
 import { toSheetModel } from "../lib/reports.js";
 import { select, classLabel, friendlyAuthError } from "./common.js";
 import { subjectsForClass, armsOf } from "../lib/structure.js";
+import { goToProgress } from "./progress.js";
 
 let unsub = null; export const stopScores = () => { unsub?.(); unsub = null; };
 const FIELDS = [["a", "1st CA", "a"], ["b", "2nd CA", "b"], ["c", "Open day", "c"], ["e", "Exam", "e"]]; const BONUS = [["at", "Attendance"], ["tb", "Textbook"], ["nb", "Notebook"]];
@@ -26,11 +27,15 @@ export async function scoresView(host) {
   if (admin) options = s.structure.classes.flatMap((c) => armsOf(c).flatMap((a) => subjectsForClass(s.structure, c.name).map((sub) => ({ subject: sub, key: classKey(c.name, a) }))));
   else options = (state.profile.assignmentsList || []).map((a) => ({ subject: a.subject, key: classKey(a.class, a.arm) }));
   if (!options.length) return mount(host, h("h1", {}, "Scores"), empty("No subjects assigned", "Your school admin has not given you a subject and class yet."));
-  const stored = localStorage.getItem("tb-sheet"); let cur = options.find((o) => `${o.subject}@@${o.key}` === stored) || options[0];
+  // Two steps: choose the class, then one of that class's subjects (never a long list of every class and subject together).
+  const classKeys = [...new Set(options.map((o) => o.key))]; const subjectsOf = (key) => [...new Set(options.filter((o) => o.key === key).map((o) => o.subject))];
+  let cur = { key: classKeys.includes(localStorage.getItem("tb-score-class")) ? localStorage.getItem("tb-score-class") : classKeys[0] };
+  cur.subject = subjectsOf(cur.key).includes(localStorage.getItem("tb-score-subject")) ? localStorage.getItem("tb-score-subject") : subjectsOf(cur.key)[0];
   const ui = { tab: "scores", term: s.current.term, q: "", sex: "all", todo: false, view: "term" }; const body = h("div", {}); let roster = null, sheet = null; const saved = h("span", { class: "chip", role: "status" }, "Saved ✓");
-  const sel = select(options.map((o) => [`${o.subject}@@${o.key}`, `${classLabel(o.key)} ${o.subject}`]), `${cur.subject}@@${cur.key}`, { "aria-label": "Class and subject", onchange: (e) => { cur = options.find((o) => `${o.subject}@@${o.key}` === e.target.value); localStorage.setItem("tb-sheet", e.target.value); open(); } });
+  const subjSel = select(subjectsOf(cur.key).map((x) => [x, x]), cur.subject, { id: "sc_subject", "aria-label": "Subject", onchange: (e) => { cur.subject = e.target.value; localStorage.setItem("tb-score-subject", cur.subject); open(); } });
+  const classSel = select(classKeys.map((k) => [k, classLabel(k)]), cur.key, { id: "sc_class", "aria-label": "Class", onchange: (e) => { cur.key = e.target.value; const subs = subjectsOf(cur.key); cur.subject = subs.includes(cur.subject) ? cur.subject : subs[0]; subjSel.replaceChildren(...subs.map((x) => h("option", { value: x, selected: x === cur.subject }, x))); localStorage.setItem("tb-score-class", cur.key); localStorage.setItem("tb-score-subject", cur.subject); open(); } });
   const tabs = h("div", { class: "subtabs", role: "tablist" }, [["scores", "Scores"], ["results", "Results"], ["students", "Students"], ["class", "Class"]].map(([id, l]) => h("button", { class: "tabbtn", role: "tab", "aria-selected": String(ui.tab === id), onclick: () => { ui.tab = id; tabs.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.textContent === l))); draw(); } }, l)));
-  mount(host, h("div", { class: "toolbar" }, sel, saved), tabs, body);
+  mount(host, h("div", { class: "pickers" }, h("div", { class: "pick" }, h("label", { for: "sc_class" }, "Class"), classSel), h("div", { class: "pick" }, h("label", { for: "sc_subject" }, "Subject"), subjSel), saved), tabs, body);
   const model = () => ({ ...toSheetModel(sheet || { subject: cur.subject, scores: {} }, roster), cls: classLabel(cur.key), teacher: sheet?.teacher || state.profile?.name || "", bonus: sheet?.bonus !== false });
   async function open() {
     mount(body, skeleton(5)); roster = null; unsub?.(); sheet = await loadSheet(session, cur.subject, cur.key).catch(() => null);
@@ -40,12 +45,14 @@ export async function scoresView(host) {
     if (!roster) return; if (!roster.length) return mount(body, empty("No students in this class", "Students appear here once they are active in this class and arm."));
     if (ui.tab === "scores") return scoresTab(); if (ui.tab === "results") return resultsTab(); if (ui.tab === "students") return studentsTab(); return classTab();
   }
-    const COLS = [["a", "1st CA"], ["b", "2nd CA"], ["c", "Open day"], ["e", "Exam"], ["at", "Attendance"], ["tb", "Textbook"], ["nb", "Notebook"]];
+  const COLS = [["a", "1st CA"], ["b", "2nd CA"], ["c", "Open day"], ["e", "Exam"], ["at", "Attendance"], ["tb", "Textbook"], ["nb", "Notebook"]];
   const gcls = (g) => `g-${String(g).replace(/[^A-Za-z]/g, "").slice(0, 1).toUpperCase()}`;
   const termTabs = (after) => h("div", { class: "term-tabs", role: "tablist", "aria-label": "Term" }, [1, 2, 3].map((t2) => h("button", { role: "tab", "aria-selected": String(ui.term === t2), onclick: () => { ui.term = t2; after(); } }, LBL[t2])));
+  const setSaved = (t) => { saved.textContent = t; document.querySelectorAll(".sheet-saved").forEach((x) => (x.textContent = t)); };
+  const mainFilled = (id) => { const r = sheet?.scores?.[String(ui.term)]?.[id] || {}; return ["a", "b", "c", "e"].filter((k) => r[k] !== undefined).length; };
+
   function scoresTab() {
-    const c = model(); const term = String(ui.term); const q = ui.q.toLowerCase(); const rows = new Map();
-    const stat = (label, el) => h("div", { class: "kpi" }, h("div", { class: "kpi-l" }, label), el);
+    const c = model(); const q = ui.q.toLowerCase(); const rows = new Map(); let order = [];
     const progress = h("div", { class: "kpi-bar", role: "progressbar", "aria-label": "Students scored" }, h("span", { class: "kpi-fill" }));
     const kScored = h("div", { class: "kpi-v" }), kAvg = h("div", { class: "kpi-v" }), kHigh = h("div", { class: "kpi-v" }), kLow = h("div", { class: "kpi-v" }), dist = h("div", { class: "dist" });
     function summary() {
@@ -56,31 +63,50 @@ export async function scoresView(host) {
       dist.replaceChildren(...grades.map((g) => h("span", { class: `gchip ${gcls(g.g)}`, title: `${g.g}: ${counts[g.g] || 0} student(s)` }, `${g.g} ${counts[g.g] || 0}`)));
     }
     function refreshRow(id) {
-      const r = rows.get(id); if (!r) return; const x = calc(model(), ui.term, id, w);
-      r.total.textContent = x ? x.t : "–"; r.total.className = `tot${x ? "" : " none"}`; r.grade.textContent = x ? grade(x.t, grades) : ""; r.grade.className = `gchip ${x ? gcls(grade(x.t, grades)) : "hide"}`; r.row.classList.toggle("done", Boolean(x)); summary();
+      const r = rows.get(id); if (!r) return; const x = calc(model(), ui.term, id, w); const n = mainFilled(id);
+      r.total.textContent = x ? x.t : "–"; r.total.className = `tot${x ? "" : " none"}`; r.grade.textContent = x ? grade(x.t, grades) : ""; r.grade.className = `gchip ${x ? gcls(grade(x.t, grades)) : "hide"}`;
+      r.sub.textContent = n === 0 ? "Tap to enter scores" : n === 4 ? "All scores entered" : `${n} of 4 entered`; r.row.dataset.state = n === 0 ? "empty" : n === 4 ? "done" : "part"; summary();
     }
     const rowFor = (stu) => {
-      const x = calc(c, ui.term, stu.id, w); const total = h("span", { class: `tot${x ? "" : " none"}` }, x ? x.t : "–"); const gr = h("span", { class: `gchip ${x ? gcls(grade(x.t, grades)) : "hide"}` }, x ? grade(x.t, grades) : "");
-      const cells = COLS.map(([k, label], i) => { const max = w[k]; const v = c.scores?.[term]?.[stu.id]?.[k];
-        const inp = h("input", { type: "number", inputmode: "decimal", min: 0, max, step: "any", value: v ?? "", "data-s": stu.id, "data-k": k, placeholder: "–", "aria-label": `${stu.n} ${label} out of ${max}` });
-        inp.addEventListener("input", () => { let val = inp.value; if (val !== "") { const n = Math.min(max, Math.max(0, +val)); if (n !== +val) { val = String(n); inp.value = val; } } const row = ((sheet ||= { subject: cur.subject, scores: {} }).scores[term] ||= {}); const r = (row[stu.id] ||= {}); if (val === "") delete r[k]; else r[k] = +val; if (!Object.keys(r).length) delete row[stu.id]; refreshRow(stu.id); queueSave(stu.id, k, val); });
-        inp.addEventListener("keydown", (e) => { const all = [...body.querySelectorAll(`input[data-k="${k}"]`)]; const at = all.indexOf(inp); if (e.key === "Enter" || e.key === "ArrowDown") { e.preventDefault(); (all[at + 1] || all[0]).focus(); } else if (e.key === "ArrowUp") { e.preventDefault(); (all[at - 1] || all[all.length - 1]).focus(); } });
-        inp.addEventListener("focus", () => inp.select());
-        return h("label", { class: `sc ${i > 3 ? "bonus" : "main"}` }, h("span", { class: "lab" }, `${label} /${max}`), inp); });
-      const row = h("div", { class: `srow${x ? " done" : ""}`, role: "group", "aria-label": stu.n },
-        h("div", { class: "sname" }, h("span", { class: "avatar", "aria-hidden": "true" }, initials(stu.n)), h("div", {}, h("strong", {}, stu.n), stu.r ? h("span", { class: "tag tag-warn" }, "Repeater") : null,
-          h("button", { class: "linkbtn", type: "button", onclick: () => formDialog(stu.n, (close) => h("div", {}, subjectReport(model(), stu.id, s, w, grades, session), h("div", { class: "dlg-actions" }, h("button", { class: "btn", onclick: () => close() }, "Close"), h("button", { class: "btn btn-primary", onclick: () => printNodes([subjectReport(model(), stu.id, s, w, grades, session)]) }, "Print")))) }, "Report"))),
-        cells, h("div", { class: "stot" }, total, gr));
-      rows.set(stu.id, { row, total, grade: gr }); return row;
+      const x = calc(c, ui.term, stu.id, w); const n = mainFilled(stu.id);
+      const total = h("span", { class: `tot${x ? "" : " none"}` }, x ? x.t : "–"); const gr = h("span", { class: `gchip ${x ? gcls(grade(x.t, grades)) : "hide"}` }, x ? grade(x.t, grades) : "");
+      const sub = h("span", { class: "sub" }, n === 0 ? "Tap to enter scores" : n === 4 ? "All scores entered" : `${n} of 4 entered`);
+      const row = h("button", { class: "srow2", type: "button", "data-s": stu.id, "data-state": n === 0 ? "empty" : n === 4 ? "done" : "part", "aria-label": `${stu.n}: open to enter scores`, onclick: () => openEditor(stu.id) },
+        h("span", { class: "avatar", "aria-hidden": "true" }, initials(stu.n)), h("span", { class: "who" }, h("strong", {}, stu.n), stu.r ? h("span", { class: "tag tag-warn" }, "Repeater") : null, sub), h("span", { class: "res" }, total, gr), h("span", { class: "chev", "aria-hidden": "true" }, "›"));
+      rows.set(stu.id, { row, total, grade: gr, sub }); return row;
     };
     const unscored = (stu) => !calc(c, ui.term, stu.id, w);
     const vis = (stu) => (!q || stu.n.toLowerCase().includes(q)) && (ui.sex === "all" || (ui.sex === "M" ? stu.s === "M" : stu.s === "F")) && (!ui.todo || unscored(stu));
-    const seg = (id, label, v) => h("button", { type: "button", role: "radio", "aria-checked": String(ui.sex === v), onclick: () => { ui.sex = v; scoresTab(); } }, label);
-    const sections = groups(c).map(([label, list]) => { const l = list.filter(vis); return l.length ? [h("h2", { class: "sec" }, label, h("span", { class: "count" }, l.length)), h("div", { class: "sheet" }, h("div", { class: "shead", "aria-hidden": "true" }, h("span", {}, "Student"), COLS.map(([k, label2]) => h("span", {}, `${label2}`, h("small", {}, ` /${w[k]}`))), h("span", {}, "Total")), l.map(rowFor))] : null; });
+    const seg = (label, v) => h("button", { type: "button", role: "radio", "aria-checked": String(ui.sex === v), onclick: () => { ui.sex = v; scoresTab(); } }, label);
+    const sections = groups(c).map(([label, list]) => { const l = list.filter(vis); order = order.concat(l.map((x) => x.id)); return l.length ? [h("h2", { class: "sec" }, label, h("span", { class: "count" }, l.length)), h("div", { class: "slist" }, l.map(rowFor))] : null; });
+
+    /** The student's score entry, opened by tapping their row: a bottom sheet on phones, a centred card on larger screens. */
+    function openEditor(id) {
+      const idx = order.indexOf(id); const stu = c.students[id]; const term = String(ui.term);
+      const dlg = h("dialog", { class: "sheet-dlg", "aria-label": `Scores for ${stu.n}` }); const bonusOn = model().bonus;
+      const live = h("div", { class: "live" }); const inputs = [];
+      const refreshLive = () => { const x = calc(model(), ui.term, id, w); mount(live, h("div", { class: "live-t" }, h("span", { class: "live-l" }, "Total"), h("strong", {}, x ? String(x.t) : "–"), x ? h("span", { class: `gchip ${gcls(grade(x.t, grades))}` }, grade(x.t, grades)) : null), h("div", { class: "kpi-bar" }, h("span", { class: `kpi-fill p${Math.round(((x?.t || 0) / 100) * 20) * 5}` })), x && model().bonus && (x.ex !== (Number(sheet?.scores?.[term]?.[id]?.e) || 0)) ? h("p", { class: "hint" }, `Exam with bonus marks: ${x.ex}`) : null); };
+      const mk = (k, label) => { const max = w[k]; const v = sheet?.scores?.[term]?.[id]?.[k];
+        const inp = h("input", { type: "number", inputmode: "decimal", min: 0, max, step: "any", value: v ?? "", "data-k": k, placeholder: "–", id: `e_${k}`, "aria-label": `${label} out of ${max}` });
+        inp.addEventListener("input", () => { let val = inp.value; if (val !== "") { const n = Math.min(max, Math.max(0, +val)); if (n !== +val) { val = String(n); inp.value = val; } } const row = ((sheet ||= { subject: cur.subject, scores: {} }).scores[term] ||= {}); const r = (row[id] ||= {}); if (val === "") delete r[k]; else r[k] = +val; if (!Object.keys(r).length) delete row[id]; refreshRow(id); refreshLive(); queueSave(id, k, val); });
+        inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); const at = inputs.indexOf(inp); if (inputs[at + 1]) inputs[at + 1].focus(); else go(1); } });
+        inp.addEventListener("focus", () => inp.select()); inputs.push(inp);
+        return h("label", { class: "bigf", for: `e_${k}` }, h("span", {}, label, h("small", {}, ` /${max}`)), inp); };
+      const go = (d) => { const nid = order[idx + d]; if (!nid) { dlg.close(); return; } dlg.close(); openEditor(nid); };
+      dlg.append(h("header", { class: "sheet-h" }, h("span", { class: "avatar", "aria-hidden": "true" }, initials(stu.n)), h("div", { class: "grow" }, h("strong", {}, stu.n), h("div", { class: "hint" }, `${cur.subject} · ${classLabel(cur.key)} · ${LBL[ui.term]} · ${idx + 1} of ${order.length}`)), h("button", { class: "btn btn-icon", type: "button", "aria-label": "Close", onclick: () => dlg.close() }, "✕")),
+        h("div", { class: "sheet-b" },
+          h("fieldset", { class: "grp" }, h("legend", {}, "Continuous assessment"), h("div", { class: "trio" }, mk("a", "1st CA"), mk("b", "2nd CA"), mk("c", "Open day"))),
+          h("fieldset", { class: "grp" }, h("legend", {}, "Exam"), mk("e", "Exam")),
+          bonusOn ? h("fieldset", { class: "grp" }, h("legend", {}, "Bonus marks (added to the exam)"), h("div", { class: "trio" }, mk("at", "Attendance"), mk("tb", "Textbook"), mk("nb", "Notebook"))) : h("p", { class: "hint" }, "Bonus marks are switched off for this sheet."),
+          live),
+        h("footer", { class: "sheet-f" }, h("span", { class: "chip sheet-saved" }, saved.textContent), h("div", { class: "stack-row" }, h("button", { class: "btn", type: "button", disabled: idx <= 0, onclick: () => go(-1) }, "‹ Previous"), h("button", { class: "btn", type: "button", disabled: idx >= order.length - 1, onclick: () => go(1) }, "Next ›"), h("button", { class: "btn btn-primary", type: "button", onclick: () => dlg.close() }, "Done")),
+          h("button", { class: "linkbtn", type: "button", onclick: () => { dlg.close(); goToProgress({ studentId: id, mode: "subject", subject: cur.subject, key: cur.key }); } }, "View progress")));
+      dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); }); dlg.addEventListener("close", () => { flush(); dlg.remove(); }); document.body.append(dlg); dlg.showModal(); refreshLive(); setTimeout(() => inputs[0]?.focus(), 60);
+    }
     mount(body, termTabs(scoresTab),
-      h("div", { class: "kpis" }, stat("Scored", h("div", {}, kScored, progress)), stat("Class average", kAvg), stat("Highest", kHigh), stat("Lowest", kLow), stat("Grades", dist)),
+      h("div", { class: "kpis compact" }, h("div", { class: "kpi" }, h("div", { class: "kpi-l" }, "Scored"), h("div", {}, kScored, progress)), h("div", { class: "kpi" }, h("div", { class: "kpi-l" }, "Average"), kAvg), h("div", { class: "kpi" }, h("div", { class: "kpi-l" }, "Highest"), kHigh), h("div", { class: "kpi" }, h("div", { class: "kpi-l" }, "Lowest"), kLow)), dist,
       h("div", { class: "filters sticky-f" }, h("input", { type: "search", placeholder: "Find a student", "aria-label": "Find a student", value: ui.q, oninput: (e) => { ui.q = e.target.value; const p = e.target.selectionStart; scoresTab(); const n = body.querySelector("input[type=search]"); n.focus(); n.setSelectionRange(p, p); } }),
-        h("div", { class: "seg", role: "radiogroup", "aria-label": "Show" }, seg("all", "All", "all"), seg("m", "Male", "M"), seg("f", "Female", "F")),
+        h("div", { class: "seg", role: "radiogroup", "aria-label": "Show" }, seg("All", "all"), seg("Male", "M"), seg("Female", "F")),
         h("label", { class: "chk" }, h("input", { type: "checkbox", checked: ui.todo, onchange: (e) => { ui.todo = e.target.checked; scoresTab(); } }), "Not scored yet"),
         h("label", { class: "chk" }, h("input", { type: "checkbox", checked: c.bonus, onchange: async (e) => { (sheet ||= { subject: cur.subject, scores: {} }).bonus = e.target.checked; scoresTab(); try { await saveSheetFlag(session, cur.subject, cur.key, { bonus: e.target.checked }); } catch (err) { toast(friendlyAuthError(err), "error"); } } }), "Add bonus marks to exam")),
       sections.flat().length ? sections : empty("No students to show", "Change the search or filters."));
@@ -106,8 +132,8 @@ export async function scoresView(host) {
       unranked.length ? h("p", { class: "muted" }, `${unranked.length} student${unranked.length === 1 ? "" : "s"} not scored yet.`) : null);
   }
   const pending = new Map(); let t;
-  function queueSave(sid, k, val) { pending.set(`${ui.term}|${sid}|${k}`, val); saved.textContent = "Saving…"; clearTimeout(t); t = setTimeout(flush, 600); }
-  async function flush() { const items = [...pending.entries()]; pending.clear(); try { for (const [key, val] of items) { const [tm, sid, k] = key.split("|"); await saveCell(session, cur.subject, cur.key, { teacher: state.profile?.name }, tm, sid, k, val === "" ? "" : +val); } saved.textContent = navigator.onLine ? "Saved ✓" : "Saved on this device"; } catch (e) { saved.textContent = "Not saved"; toast(friendlyAuthError(e), "error"); } }
+  function queueSave(sid, k, val) { pending.set(`${ui.term}|${sid}|${k}`, val); setSaved("Saving…"); clearTimeout(t); t = setTimeout(flush, 600); }
+  async function flush() { const items = [...pending.entries()]; pending.clear(); try { for (const [key, val] of items) { const [tm, sid, k] = key.split("|"); await saveCell(session, cur.subject, cur.key, { teacher: state.profile?.name }, tm, sid, k, val === "" ? "" : +val); } setSaved(navigator.onLine ? "Saved ✓" : "Saved on this device"); } catch (e) { setSaved("Not saved"); toast(friendlyAuthError(e), "error"); } }
   function studentsTab() {
     const c = model(); mount(body, h("div", { class: "toolbar" }, h("button", { class: "btn", onclick: () => printNodes(c ? Object.keys(c.students).sort((a, b) => c.students[a].n.localeCompare(c.students[b].n)).map((id) => subjectReport(c, id, s, w, grades, session)) : []) }, "Print all reports")),
       h("p", { class: "muted" }, "Students come from your school's register. The class teacher or admin adds, edits and sets gender under Students."),

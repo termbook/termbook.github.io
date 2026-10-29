@@ -1,9 +1,9 @@
 import { h, mount, toast, empty, skeleton, downloadCsv, initials, confirmDialog } from "../lib/dom.js";
 import { state, roleOf } from "../lib/store.js";
-import { watchStudents, watchAttendance, saveAttendanceDay, watchHolidays, addHoliday, removeHoliday, loadTerm, nationalHolidays } from "../lib/data.js";
+import { watchStudents, watchAttendance, saveAttendanceDay, watchHolidays, addHoliday, removeHoliday, loadTerm, nationalHolidays, syncStudentAttendance, marksMask, watchAbsenceNotes } from "../lib/data.js";
 import { classPicker, classLabel, input, select, friendlyAuthError } from "./common.js";
 import { isEnrolled } from "../lib/students.js";
-import { SESSIONS, dstr, parseD, addDays, todayStr, weekDates, currentWeekIndex, weekSummary, termSummary, sortStudents, dayPoints, isWeekend } from "../lib/attendance.js";
+import { SESSIONS, schoolDaysUpTo, dstr, parseD, addDays, todayStr, weekDates, currentWeekIndex, weekSummary, termSummary, sortStudents, dayPoints, isWeekend } from "../lib/attendance.js";
 import { showDate, showLong } from "../lib/dates.js";
 import { dateSelect } from "../lib/datepick.js";
 
@@ -32,7 +32,7 @@ export async function attendanceView(host, tab = "register") {
   mount(host, h("h1", {}, "Attendance"), picker ? h("div", { class: "toolbar" }, picker) : h("p", { class: "muted" }, classLabel(ui.key)), nav, body);
   if (tab === "holidays") return holidaysTab(body, admin);
   if (!termStart) return mount(body, empty("Set the term start date", admin ? "Open Setup and enter the term's start date (a Monday). Attendance weeks are counted from it." : "Your school admin needs to set the term start date first."));
-  const data = { students: null, att: {}, hol: {} };
+  const data = { students: null, att: {}, hol: {}, notes: {} };
   ui.week = currentWeekIndex(termStart, weeks, todayStr());
   function load() {
     stopAttendance(); if (!ui.key) return mount(body, empty("Choose a class", "Pick a class and arm to open its register."));
@@ -42,13 +42,22 @@ export async function attendanceView(host, tab = "register") {
       watchStudents((l) => { data.students = sortStudents((l || []).filter((x) => x.classKey === ui.key && isEnrolled(x))); draw(); }),
       watchAttendance(ui.key, termStart, end, (m) => { data.att = m || {}; draw(); }),
       watchHolidays((m) => { data.hol = m; draw(); }),
+      watchAbsenceNotes(ui.key, (m) => { data.notes = m; draw(); }),
     ];
   }
   const hint = () => { const sync = document.getElementById("sync"); if (sync) sync.textContent = navigator.onLine ? "Synced" : "Offline"; };
   let timer; const marks = () => data.att;
+  const dirty = new Set();
   function setMark(date, sid, sess, val) {
-    const day = (data.att[date] ||= {}); const m = (day[sid] ||= {}); if (val) m[sess] = true; else delete m[sess]; if (!m[AM] && !m[PM]) delete day[sid];
-    clearTimeout(timer); timer = setTimeout(async () => { try { await saveAttendanceDay(ui.key, date, data.att[date] || {}, { session: s.current.session, term: s.current.term, class: ui.key.split("|")[0], arm: ui.key.split("|")[1] }); } catch (e) { toast(friendlyAuthError(e), "error"); } hint(); }, 350);
+    dirty.add(sid); const day = (data.att[date] ||= {}); const m = (day[sid] ||= {}); if (val) m[sess] = true; else delete m[sess]; if (!m[AM] && !m[PM]) delete day[sid];
+    clearTimeout(timer); timer = setTimeout(async () => {
+      const ids = [...dirty]; dirty.clear();
+      try {
+        await saveAttendanceDay(ui.key, date, data.att[date] || {}, { session: s.current.session, term: s.current.term, class: ui.key.split("|")[0], arm: ui.key.split("|")[1] });
+        // The student's own record (what a parent sees) follows the register.
+        await syncStudentAttendance({ session: s.current.session, term: s.current.term, key: ui.key, date, changes: ids.map((studentId) => ({ studentId, mask: marksMask((data.att[date] || {})[studentId]) })), openDays: schoolDaysUpTo(termStart, weeks, data.hol, todayStr()) });
+      } catch (e) { ids.forEach((x) => dirty.add(x)); toast(friendlyAuthError(e), "error"); } hint();
+    }, 350);
   }
   function draw() {
     if (!data.students) return; const st = data.students;
@@ -58,7 +67,7 @@ export async function attendanceView(host, tab = "register") {
   function register(st) {
     const d = ui.date, day = data.att[d] || {}, hol = data.hol[d], weekend = isWeekend(parseD(d));
     const tally = (sess) => st.filter((x) => day[x.id]?.[sess]).length;
-    const q = ui.q.toLowerCase(); const row = (x, i) => h("div", { class: "reg-row" }, h("span", { class: "reg-name" }, h("span", { class: "avatar", "aria-hidden": "true" }, initials(x.name)), `${i + 1}. ${x.name}`),
+    const q = ui.q.toLowerCase(); const row = (x, i) => h("div", { class: "reg-row" }, h("span", { class: "reg-name" }, h("span", { class: "avatar", "aria-hidden": "true" }, initials(x.name)), h("span", { class: "reg-text" }, `${i + 1}. ${x.name}`, data.notes[`${x.id}_${d}`] ? h("small", { class: "pnote" }, `Parent note: ${data.notes[`${x.id}_${d}`].reason}`) : null)),
       [AM, PM].map((sess) => h("label", { class: "sw" }, h("span", { class: "sr" }, `${x.name} ${sess === AM ? "AM" : "PM"}`), h("input", { type: "checkbox", checked: Boolean(day[x.id]?.[sess]), disabled: Boolean(hol) || weekend, onchange: (e) => { setMark(d, x.id, sess, e.target.checked); draw(); } }), h("i", {}))));
     const grp = (g, title) => { const l = st.filter((x) => x.gender === g); const vis = l.filter((x) => !q || x.name.toLowerCase().includes(q)); return l.length ? [h("h2", {}, title, h("span", { class: "count" }, l.length)), h("div", { class: "reg-list" }, vis.map((x) => row(x, l.indexOf(x))))] : null; };
     const dateIn = dateSelect({ id: "rd", label: "Register date", value: d, from: new Date().getFullYear() - 1, to: new Date().getFullYear() + 1 }); dateIn.addEventListener("change", () => { if (dateIn.value) { ui.date = dateIn.value; draw(); } });

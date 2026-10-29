@@ -1,9 +1,10 @@
 import { h, mount, toast, confirmDialog, formDialog, field, empty, skeleton } from "../lib/dom.js";
 import { state, roleOf, effectiveSchoolId } from "../lib/store.js";
-import { listTeachers, setTeacher, saveSchool, loadTerm, saveTerm, nationalHolidays, addHoliday, watchStudents, exportCollection, currentSessionLabel, bulkStudentAction, termId } from "../lib/data.js";
+import { listTeachers, setTeacher, saveSchool, loadTerm, saveTerm, nationalHolidays, addHoliday, studentsOnce, rebuildStudentAttendance, exportCollection, currentSessionLabel, bulkStudentAction, termId } from "../lib/data.js";
 import { input, select, rolePicker, classLabel, friendlyAuthError } from "./common.js";
 import { showDate } from "../lib/dates.js";
 import { dateSelect, sessionOptions } from "../lib/datepick.js";
+import { schoolDaysUpTo, todayStr } from "../lib/attendance.js";
 import { promotionTarget } from "../lib/students.js";
 import { subjectsByLevel, unionSubjects } from "../lib/structure.js";
 import { DEFAULT_GRADES, DEFAULT_WEIGHTS } from "../lib/scores.js";
@@ -16,8 +17,8 @@ export async function overviewView(host) {
   mount(host, h("h1", {}, "Overview"), skeleton(3));
   const s = state.school; let teachers = []; try { teachers = await listTeachers(); } catch { /* offline */ }
   const pending = teachers.filter((t) => t.status === "pending").length;
-  const un = watchStudents((list) => {
-    un(); if (!list) return;
+  studentsOnce().catch(() => null).then((list) => {
+    if (!list) return;
     const act = list.filter((x) => !x.deleted && x.status === "active").length, pend = list.filter((x) => !x.deleted && x.status === "pending").length;
     const card = (v, l, href) => h("a", { class: "stat", href }, h("div", { class: "v" }, v), h("div", { class: "l" }, l));
     mount(host, h("h1", {}, s.name),
@@ -83,7 +84,7 @@ export async function setupView(host) {
     const promote = cur.term === 3;
     if (!await confirmDialog({ title: `Start ${nextT === 1 ? "1st" : nextT === 2 ? "2nd" : "3rd"} term, ${nextS}?`, body: `Past attendance, scores and reports stay in the history.${promote ? " After this you can promote all active students to the next class." : ""} Set the new term's start date afterwards.`, confirmLabel: "Start term" })) return;
     try { await saveSchool({ current: { session: nextS, term: nextT } }); toast("New term started. Set its start date."); if (promote && await confirmDialog({ title: "Promote all active students now?", body: "Each moves up one class (SS3 become Graduated). You can also do this later from Students.", confirmLabel: "Promote all" })) {
-      const un = watchStudents(async (list) => { un(); const act = list.filter((x) => !x.deleted && x.status === "active"); const targets = {}; act.forEach((x) => { const t = promotionTarget(x, s.structure); if (t) targets[x.id] = t; }); await bulkStudentAction(Object.keys(targets), "promote", { targets, date: new Date().toISOString().slice(0, 10) }, act); toast("Students promoted"); }); }
+      studentsOnce().then(async (list) => { const act = list.filter((x) => !x.deleted && x.status === "active"); const targets = {}; act.forEach((x) => { const t = promotionTarget(x, s.structure); if (t) targets[x.id] = t; }); await bulkStudentAction(Object.keys(targets), "promote", { targets, date: new Date().toISOString().slice(0, 10) }, act); toast("Students promoted"); }); }
       setupView(host); } catch (e) { toast(friendlyAuthError(e), "error"); }
   }
   // --- scoring
@@ -110,6 +111,10 @@ export async function setupView(host) {
     h("div", { class: "stack-row" }, h("button", { class: "btn btn-sm", type: "button", onclick: () => { tb.value = DEFAULT_TUTOR_BANDS.map(bandLine).join("\n"); pb.value = DEFAULT_PRINCIPAL_BANDS.map(bandLine).join("\n"); } }, "Fill in the sample templates")), field("Next term begins (for the current term)", nxt),
     field("State or ministry crest (shows on the left)", pick("stateLogo", 260, 260, 110000, statePrev)), statePrev, field("School logo (shows on the right)", pick("logo", 260, 260, 110000, logoPrev)), logoPrev, field("Principal's signature", pick("signature", 300, 110, 40000, signPrev)), signPrev, rMsg,
     h("button", { class: "btn btn-primary", type: "button", onclick: async () => { const d = nxt.value; if (nxt.partial) return fail(rMsg, "Choose the day, month and year, or clear all three."); try { await saveSchool({ report: { heading: rh.value.trim(), subheading: rs.value.trim(), footerCredit: rf.value.trim(), tutorComment: rt.value.trim(), principalComment: rp.value.trim(), tutorBands: lines(tb.value).map(parseBandLine).filter(Boolean), principalBands: lines(pb.value).map(parseBandLine).filter(Boolean) }, branding: newBranding }); await saveTerm(s.current.session, s.current.term, { nextTermBegins: d }); out(rMsg); } catch (e) { fail(rMsg, friendlyAuthError(e)); } } }, "Save report card"));
+  // --- student attendance records (what parents see)
+  const rbMsg = h("p", { hidden: true, role: "status" });
+  const rebuildCard = h("section", { class: "card" }, h("h2", {}, "Student attendance records"), h("p", { class: "muted" }, "Each student's own attendance record, which their parent sees, follows the class register automatically. If you took attendance before this feature existed, press the button once to build the records from the registers."), rbMsg,
+    h("button", { class: "btn", type: "button", onclick: async (e) => { e.target.disabled = true; try { const list = await studentsOnce(); const hol = {}; (await exportCollection("holidays")).forEach((d) => (hol[d.id] = { label: d.reason })); const od = {}; for (const t of [1, 2, 3]) { const info = await loadTerm(s.current.session, t).catch(() => null); if (info?.startDate) od[t] = schoolDaysUpTo(info.startDate, info.weeks || 13, hol, todayStr()); } const n = await rebuildStudentAttendance(s.current.session, list, od); rbMsg.className = "form-msg ok"; rbMsg.textContent = `Built ${n} student records.`; rbMsg.hidden = false; } catch (err) { fail(rbMsg, friendlyAuthError(err)); } e.target.disabled = false; } }, "Build records from the registers"));
   // --- backup
   const bkMsg = h("p", { hidden: true, role: "status" });
   const backupCard = h("section", { class: "card" }, h("h2", {}, "Backup"), h("p", { class: "muted" }, "Download everything for this school as an Excel workbook: students, teachers, attendance and score sheets."), bkMsg,
@@ -119,5 +124,5 @@ export async function setupView(host) {
       const att = await exportCollection("attendance"); add("Attendance", att.flatMap((d) => Object.entries(d.marks || {}).map(([sid, m]) => ({ date: d.date, class: d.classKey, studentId: sid, AM: m.morning ? 1 : 0, PM: m.afternoon ? 1 : 0 }))));
       const sheets = await exportCollection("sheets"); add("Scores", sheets.flatMap((sh) => Object.entries(sh.scores || {}).flatMap(([tm, byS]) => Object.entries(byS).map(([sid, r]) => ({ session: sh.session, term: tm, class: sh.classKey, subject: sh.subject, studentId: sid, ...r })))));
       XLSX.writeFile(wb, `${s.name.replace(/\W+/g, "_")}_backup_${new Date().toISOString().slice(0, 10)}.xlsx`); bkMsg.hidden = true; } catch (err) { fail(bkMsg, friendlyAuthError(err)); } e.target.disabled = false; } }, "Download backup (Excel)"));
-  mount(host, h("h1", {}, "Setup"), h("div", { class: "cards" }, detailsCard, structureCard, termCard, scoringCard, reportCard, backupCard));
+  mount(host, h("h1", {}, "Setup"), h("div", { class: "cards" }, detailsCard, structureCard, termCard, scoringCard, reportCard, rebuildCard, backupCard));
 }

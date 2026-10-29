@@ -18,7 +18,7 @@ describe("report card, checked against the school's real cards", () => {
     expect(c.rows.map((r) => r.subject).slice(0, 3)).toEqual(["General Mathematics", "English Language", "Agricultural Science"]);
     expect(c.rows.length).toBe(18);
     expect(c.counts).toMatchObject({ offered: 9, passed: 9, failed: 0, classSize: 1, position: 1 });
-    expect(c.totals).toEqual({ obtainable: 900, obtained: 550, percent: 61.1 });
+    expect(c.totals).toMatchObject({ obtainable: 900, obtained: 550, percent: 61.1 });
     const g = Object.fromEntries(c.rows.filter((r) => r.offered).map((r) => [r.subject, [r.total, r.grade, r.remark]]));
     expect(g["General Mathematics"]).toEqual([48, "P", "PASS"]); expect(g["Animal Husbandry"]).toEqual([62, "C", "GOOD"]); expect(g["Civic Education"]).toEqual([72, "A", "DISTINCTION"]); expect(g["Financial Accounting"]).toEqual([70, "A", "DISTINCTION"]);
     expect(c.rows.find((r) => r.subject === "Biology")).toMatchObject({ offered: false, grade: "NA", remark: "NOT APPLICABLE", total: 0 });
@@ -44,7 +44,7 @@ describe("report card, checked against the school's real cards", () => {
     expect(r["English Language"]).toMatchObject({ total: 74, t2: 52, t1: 65, avg: 63.7, grade: "C", remark: "GOOD" });
     expect(r["Data Processing"].avg).toBe(71.7); expect(r["Agricultural Science"]).toMatchObject({ t1: 0, avg: 66.5 }); expect(r["Economics"].avg).toBe(74.5);
     expect(r["Chemistry"]).toMatchObject({ avg: 45.3, grade: "P", remark: "PASS" }); expect(r["Physics"]).toMatchObject({ avg: 77.3, grade: "A" });
-    expect(c.totals).toEqual({ obtainable: 1000, obtained: 645.3, percent: 64.5 }); expect(c.counts).toMatchObject({ offered: 10, passed: 10, failed: 0 });
+    expect(c.totals).toMatchObject({ obtainable: 1000, obtained: 645.3, percent: 64.5 }); expect(c.counts).toMatchObject({ offered: 10, passed: 10, failed: 0 });
     expect(c.attendance).toEqual({ opened: 252, present: 240, absent: 12 });
   });
   it("ranks the class by total obtained and shares positions on ties", () => {

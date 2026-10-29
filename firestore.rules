@@ -19,6 +19,8 @@ service cloud.firestore {
     function isClassTeacher(sid, key) { return isOwner() || isAdmin(sid) || (isTeacher(sid) && meDoc().classTeacherKey == key); }
     function teachesSubject(sid, subject, key) { return isOwner() || isAdmin(sid) || (isTeacher(sid) && (subject + '|' + key) in meDoc().assignments); }
     function requireVerification() { return get(/databases/$(db)/documents/config/platform).data.requireVerification == true; }
+    // A signed-in parent whose link to this student exists (created with the school's access code, removable by the admin).
+    function linkedParent(sid, studentId) { return verified() && hasProfile() && meDoc().role == 'parent' && exists(/databases/$(db)/documents/schools/$(sid)/links/$(request.auth.uid + '_' + studentId)); }
     function termPublished(sid, termId) { return get(/databases/$(db)/documents/schools/$(sid)/terms/$(termId)).data.published == true; }
 
     match /config/{doc} {
@@ -92,10 +94,16 @@ service cloud.firestore {
 
         match /private/{doc} {
           allow read: if isOwner() || isAdmin(sid)
-            || isClassTeacher(sid, get(/databases/$(db)/documents/schools/$(sid)/students/$(id)).data.classKey);
-          // getAfter lets a class teacher write a new student and its private details in one batch.
-          allow write: if isOwner() || isAdmin(sid)
-            || isClassTeacher(sid, getAfter(/databases/$(db)/documents/schools/$(sid)/students/$(id)).data.classKey);
+            || isClassTeacher(sid, get(/databases/$(db)/documents/schools/$(sid)/students/$(id)).data.classKey)
+            || (doc == 'info' && linkedParent(sid, id));
+          allow create, update: if isOwner() || isAdmin(sid)
+            || isClassTeacher(sid, get(/databases/$(db)/documents/schools/$(sid)/students/$(id)).data.classKey)
+            || (doc == 'info' && linkedParent(sid, id)
+                && request.resource.data.keys().hasOnly(['stateOfOrigin', 'lgaOfOrigin', 'nationality', 'previousSchool', 'address', 'relationship', 'phone', 'email',
+                     'fatherName', 'fatherPhone', 'fatherOccupation', 'motherName', 'motherPhone', 'motherOccupation', 'emergencyName', 'emergencyRelationship', 'emergencyPhone',
+                     'bloodGroup', 'genotype', 'allergies', 'medicalConditions', 'medications', 'disability', 'doctorHospital', 'healthNotes',
+                     'transport', 'boarding', 'siblings', 'notes', 'religion', 'updatedAt', 'updatedBy', 'updatedByRole']));
+          allow delete: if isOwner() || isAdmin(sid);
         }
       }
 
@@ -167,6 +175,29 @@ service cloud.firestore {
           && (isOwner() || isAdmin(sid)
               || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ratings', 'tutorComment', 'tutorName', 'updatedAt', 'updatedBy']));
         allow delete: if isOwner() || isAdmin(sid);
+      }
+
+      // One record per student and session with the days present, so a parent can follow their own child's attendance.
+      // The class teacher (or admin) keeps it in step with the register. It holds no other student's data.
+      match /studentAttendance/{docId} {
+        allow read: if isClassTeacher(sid, resource.data.classKey) || linkedParent(sid, resource.data.studentId);
+        allow create: if isClassTeacher(sid, request.resource.data.classKey)
+          && get(/databases/$(db)/documents/schools/$(sid)/students/$(request.resource.data.studentId)).data.classKey == request.resource.data.classKey;
+        allow update: if isClassTeacher(sid, resource.data.classKey) && request.resource.data.classKey == resource.data.classKey;
+        allow delete: if isOwner() || isAdmin(sid);
+      }
+
+      // A parent can tell the class teacher why their child was absent. Parents cannot change attendance marks.
+      match /absenceNotes/{nid} {
+        allow read: if isClassTeacher(sid, resource.data.classKey) || (verified() && resource.data.uid == request.auth.uid);
+        allow create: if linkedParent(sid, request.resource.data.studentId)
+          && request.resource.data.uid == request.auth.uid
+          && nid == request.resource.data.studentId + '_' + request.resource.data.date
+          && get(/databases/$(db)/documents/schools/$(sid)/students/$(request.resource.data.studentId)).data.classKey == request.resource.data.classKey
+          && request.resource.data.keys().hasOnly(['studentId', 'classKey', 'date', 'reason', 'uid', 'createdAt']);
+        allow update: if verified() && resource.data.uid == request.auth.uid && linkedParent(sid, resource.data.studentId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reason', 'createdAt']);
+        allow delete: if isOwner() || isAdmin(sid) || (verified() && resource.data.uid == request.auth.uid);
       }
 
       // Compiled report cards. Parents read their own child's report only after the term is published.

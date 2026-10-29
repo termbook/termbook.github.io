@@ -39,6 +39,8 @@ beforeEach(async () => {
       "schools/s1/links/parent1_st1": { uid: "parent1", studentId: "st1", code: "ABC123" },
       "schools/s1/reports/t1_st1": { termId: "t1", studentId: "st1", classKey: "SS2|A" },
       "schools/s1/reports/t2_st1": { termId: "t2", studentId: "st1", classKey: "SS2|A" },
+      "schools/s1/studentAttendance/2026-2027_st1": { studentId: "st1", classKey: "SS2|A", session: "2026/2027", d: { "2026-09-21": 3 } },
+      "users/ct2": { uid: "ct2", ...T({ classTeacherKey: "SS2|A", classKeys: ["SS2|A"] }) },
       "schools/s1/sheets/math": { subject: "Mathematics", classKey: "SS2|A", scores: {} },
       "schools/s1/sheets/eng": { subject: "English", classKey: "SS2|A", scores: {} },
     };
@@ -145,6 +147,38 @@ describe("student management", () => {
     await assertSucceeds(updateDoc(doc(as("adm1"), "schools/s1"), { report: { heading: "X" }, branding: { logo: "data:image/png;base64,AA" } }));
     await assertFails(updateDoc(doc(as("ctch"), "schools/s1"), { report: { heading: "Y" } }));
     await assertSucceeds(updateDoc(doc(as("adm1"), "publicSchools/s1"), { name: "One", state: "Lagos", lga: "Ikeja", branding: { logo: "data:image/png;base64,AA" } }));
+  });
+  it("a linked parent can read and edit the family, health and emergency details of their own child only", async () => {
+    const p = as("parent1"), info = (db, id) => doc(db, `schools/s1/students/${id}/private/info`);
+    await assertSucceeds(getDoc(info(p, "st1")));
+    await assertSucceeds(setDoc(info(p, "st1"), { allergies: "Peanuts", emergencyName: "Aunt Ade", genotype: "AS", updatedByRole: "parent" }, { merge: true }));
+    await assertFails(setDoc(info(p, "st1"), { allergies: "x", isAdmin: true }, { merge: true }));          // only the listed detail fields
+    await assertFails(getDoc(info(p, "st2"))); await assertFails(setDoc(info(p, "st2"), { allergies: "x" }, { merge: true })); // another child
+    await assertFails(getDoc(info(as("parent2"), "st1")));                                                  // not linked
+    await assertFails(updateDoc(doc(p, "schools/s1/students/st1"), { name: "CHANGED" }));                   // identity stays with the school
+    await assertSucceeds(getDoc(info(as("ct2"), "st1")));                                                   // the class teacher sees what the parent entered
+    await assertFails(getDoc(info(as("subj"), "st1")));
+  });
+  it("a parent reads only their own child's attendance record and cannot change it; the class teacher keeps it", async () => {
+    const rec = (db, id) => doc(db, `schools/s1/studentAttendance/${id}`);
+    await assertSucceeds(getDoc(rec(as("parent1"), "2026-2027_st1")));
+    await assertFails(getDoc(rec(as("parent2"), "2026-2027_st1")));
+    await assertFails(setDoc(rec(as("parent1"), "2026-2027_st1"), { studentId: "st1", classKey: "SS2|A", d: { "2026-09-22": 3 } }, { merge: true }));
+    await assertSucceeds(setDoc(rec(as("ct2"), "2026-2027_st1"), { studentId: "st1", classKey: "SS2|A", d: { "2026-09-22": 3 } }, { merge: true }));
+    await assertSucceeds(setDoc(rec(as("ctch"), "2026-2027_st2"), { studentId: "st2", classKey: "SS1|A", d: { "2026-09-21": 1 } }));
+    await assertFails(setDoc(rec(as("ctch"), "2026-2027_x"), { studentId: "st1", classKey: "SS2|A", d: {} }));  // not their class
+    await assertFails(getDoc(rec(as("subj"), "2026-2027_st1")));
+  });
+  it("a parent can leave an absence note for their own child; only that class's teacher and the parent read it", async () => {
+    const note = (db, id) => doc(db, `schools/s1/absenceNotes/${id}`); const base = { studentId: "st1", classKey: "SS2|A", date: "2026-09-21", reason: "Malaria", uid: "parent1" };
+    await assertSucceeds(setDoc(note(as("parent1"), "st1_2026-09-21"), base));
+    await assertFails(setDoc(note(as("parent2"), "st1_2026-09-22"), { ...base, date: "2026-09-22", uid: "parent2" })); // not linked
+    await assertFails(setDoc(note(as("parent1"), "wrong-id"), base));
+    await assertFails(setDoc(note(as("parent1"), "st1_2026-09-23"), { ...base, date: "2026-09-23", extra: 1 }));
+    await assertSucceeds(updateDoc(note(as("parent1"), "st1_2026-09-21"), { reason: "Fever" }));
+    await assertSucceeds(getDoc(note(as("parent1"), "st1_2026-09-21"))); await assertSucceeds(getDoc(note(as("ct2"), "st1_2026-09-21")));
+    await assertFails(getDoc(note(as("ctch"), "st1_2026-09-21"))); await assertFails(getDoc(note(as("parent2"), "st1_2026-09-21")));
+    await assertSucceeds(deleteDoc(note(as("parent1"), "st1_2026-09-21")));
   });
   it("a subject teacher can list only the classes they teach", async () => {
     const db = as("subj");

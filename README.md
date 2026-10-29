@@ -26,6 +26,8 @@ Termbook gives each school a daily AM/PM attendance register and per-subject sco
 - Student management for admins: full list, promote, move, tag as no longer in school, soft-delete and restore, and bulk import from a downloadable CSV or Excel template.
 - Teacher registration with admin approval and role assignment.
 - Parent access by admission number and a revocable code.
+- Progress tracking with charts for each student and for a whole class or subject, for class teachers, subject teachers, admins, the owner and, for their own child, parents.
+- Parent accounts that link several children (even at different schools), follow attendance, send absence notes and update the child's family and health details.
 - Platform owner tools: school verification, audit log, national holidays and backups.
 - Light and dark themes, installable PWA, print styles for report cards.
 

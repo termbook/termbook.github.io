@@ -197,3 +197,8 @@ export function csvCell(value) {
 export function toCsv(rows) {
   return rows.map((r) => r.map(csvCell).join(",")).join("\r\n");
 }
+
+/** Every school day of a term up to today (weekends, holidays and future dates left out), as YYYY-MM-DD. */
+export function schoolDaysUpTo(termStart, weeks, holidays, today) {
+  const out = []; for (let i = 0; i < weeks * 7; i++) { const ds = dstr(addDays(parseD(termStart), i)); if (isSchoolDay(ds, holidays, today)) out.push(ds); } return out;
+}

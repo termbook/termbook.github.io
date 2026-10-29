@@ -60,3 +60,11 @@ Set your own wording in **Setup > Report card > Principal's comment templates** 
 Then check the cards and press **Publish term results** so parents can see them.
 
 What prints is calculated for you: subjects offered, passed and failed; class position, which is the rank by total percentage (students with the same percentage share a position); times school opened, present and absent from the attendance register (two marks per school day); totals and percentages, and in 3rd term the average of the terms the student was scored, rounded to one decimal (71.67 prints as 71.7). The class category on the card is the student's section (Science, Arts, Commercial or Technical), chosen on the student's record.
+
+## Progress tracking
+**Progress** shows any class as a group (percentage by term, score spread, subject averages, grades, attendance by week, students needing attention) and any student individually. Choose a class, and optionally a single subject, to follow a subject across the class. The platform owner can open any school and see the same.
+
+Each student's own attendance record (what a parent sees) follows the class register automatically. If you took attendance before this existed, open **Setup > Student attendance records** and press **Build records from the registers** once.
+
+## Parents
+Parents can link several children (even at different schools) with one account, see progress charts and published report cards, follow attendance and send absence notes, and update their child's family, health and emergency details. You can see what they entered when you open the student. **Revoke access** on a student removes the link.

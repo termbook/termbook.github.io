@@ -5,6 +5,7 @@ import { STATUS, LEFT_REASONS, classKey, promotionTarget, findDuplicates, filter
 import { input, select, classPicker, allArms, classLabel, friendlyAuthError, loadNg } from "./common.js";
 import { FIELDS, fieldByKey, splitExtra } from "../lib/studentFields.js";
 import { armsOf } from "../lib/structure.js";
+import { goToProgress } from "./progress.js";
 import { showDate, validPhone } from "../lib/dates.js";
 import { dateSelect } from "../lib/datepick.js";
 import { autoParent } from "../lib/attendance.js";
@@ -53,14 +54,14 @@ export function studentsView(host) {
         ui.status === "left" || ui.status === "graduated" ? h("button", { class: "btn btn-sm", disabled: !selected.length, onclick: () => act("reactivate", selected) }, "Back in school") : null,
         ui.status === "pending" ? h("button", { class: "btn btn-sm btn-primary", disabled: !selected.length, onclick: () => act("approve", selected) }, "Approve") : null,
         h("button", { class: "btn btn-sm btn-danger-quiet", disabled: !selected.length, onclick: () => act("remove", selected) }, "Remove")]) : null;
-    const table = rows.length ? h("div", { class: "table-wrap" }, h("table", {},
+    const table = rows.length ? h("div", { class: "table-wrap stack-table" }, h("table", {},
       h("thead", {}, h("tr", {}, isAdmin ? h("th", { scope: "col" }, h("input", { type: "checkbox", "aria-label": "Select all on this page", checked: view.length > 0 && view.every((s) => ui.sel.has(s.id)), onchange: (e) => { view.forEach((s) => (e.target.checked ? ui.sel.add(s.id) : ui.sel.delete(s.id))); drawList(); } })) : null, h("th", { scope: "col" }, "Name"), h("th", { scope: "col" }, "Class"), h("th", { scope: "col" }, "Admission no."), h("th", { scope: "col" }, "Status"), h("th", { scope: "col" }, ""))),
       h("tbody", {}, view.map((s) => h("tr", { class: s.deleted ? "deleted" : "" },
         isAdmin ? h("td", {}, h("input", { type: "checkbox", "aria-label": `Select ${s.name}`, checked: ui.sel.has(s.id), onchange: (e) => { e.target.checked ? ui.sel.add(s.id) : ui.sel.delete(s.id); drawList(); } })) : null,
-        h("td", {}, h("span", { class: "avatar", "aria-hidden": "true" }, initials(s.name)), s.name, s.repeater ? h("span", { class: "tag tag-warn" }, "Repeater") : null),
+        h("th", { scope: "row" }, h("span", { class: "avatar", "aria-hidden": "true" }, initials(s.name)), s.name, s.repeater ? h("span", { class: "tag tag-warn" }, "Repeater") : null),
         h("td", {}, classLabel(s.classKey || "")), h("td", {}, s.admissionNo),
         h("td", {}, h("span", { class: `tag tag-${s.deleted ? "err" : s.status}` }, s.deleted ? "Removed" : STATUS[s.status] || s.status), s.status === "left" && s.leftReason ? h("div", { class: "hint" }, s.leftReason + (s.leftOn ? ` (${showDate(s.leftOn)})` : "")) : null),
-        h("td", {}, h("button", { class: "btn btn-sm", type: "button", onclick: () => editDialog(s) }, "Open")))))))
+        h("td", { class: "acts" }, h("button", { class: "btn btn-sm", type: "button", onclick: () => editDialog(s) }, "Open"), isAdmin || s.classKey === addKeys ? h("button", { class: "btn btn-sm", type: "button", onclick: () => goToProgress({ studentId: s.id, mode: "class", key: s.classKey }) }, "Progress") : null))))))
       : empty("No students match", ui.status === "active" && !all.length ? "Add students one by one or paste a list to get started." : "Try a different search or filter.");
     const pager = pages > 1 ? h("div", { class: "pager" }, h("button", { class: "btn btn-sm", disabled: ui.page === 0, onclick: () => { ui.page--; drawList(); } }, "Previous"), h("span", {}, `Page ${ui.page + 1} of ${pages} (${rows.length} students)`), h("button", { class: "btn btn-sm", disabled: ui.page >= pages - 1, onclick: () => { ui.page++; drawList(); } }, "Next")) : h("p", { class: "muted" }, `${rows.length} student${rows.length === 1 ? "" : "s"}`);
     mount(listHost, bar, table, pager);
