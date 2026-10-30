@@ -32,10 +32,15 @@ export async function scoresView(host) {
   let cur = { key: classKeys.includes(localStorage.getItem("tb-score-class")) ? localStorage.getItem("tb-score-class") : classKeys[0] };
   cur.subject = subjectsOf(cur.key).includes(localStorage.getItem("tb-score-subject")) ? localStorage.getItem("tb-score-subject") : subjectsOf(cur.key)[0];
   const ui = { tab: "scores", term: s.current.term, q: "", sex: "all", todo: false, view: "term" }; const body = h("div", {}); let roster = null, sheet = null; const saved = h("span", { class: "chip", role: "status" }, "Saved ✓");
-  const subjSel = select(subjectsOf(cur.key).map((x) => [x, x]), cur.subject, { id: "sc_subject", "aria-label": "Subject", onchange: (e) => { cur.subject = e.target.value; localStorage.setItem("tb-score-subject", cur.subject); open(); } });
-  const classSel = select(classKeys.map((k) => [k, classLabel(k)]), cur.key, { id: "sc_class", "aria-label": "Class", onchange: (e) => { cur.key = e.target.value; const subs = subjectsOf(cur.key); cur.subject = subs.includes(cur.subject) ? cur.subject : subs[0]; subjSel.replaceChildren(...subs.map((x) => h("option", { value: x, selected: x === cur.subject }, x))); localStorage.setItem("tb-score-class", cur.key); localStorage.setItem("tb-score-subject", cur.subject); open(); } });
+  const store = () => { localStorage.setItem("tb-score-class", cur.key); localStorage.setItem("tb-score-subject", cur.subject); };
+  const chipRow = (label, opts, current, onPick) => h("div", { class: "chiprow" }, h("span", { class: "chiplabel" }, label), h("div", { class: "chips", role: "tablist", "aria-label": label }, opts.map(([v, l]) => h("button", { type: "button", role: "tab", "data-v": v, "aria-selected": String(v === current), onclick: () => onPick(v) }, l))));
+  const pickers = h("div", { class: "pickers2" });
+  function drawPickers() {
+    mount(pickers, chipRow("Class", classKeys.map((k) => [k, classLabel(k)]), cur.key, (k) => { cur.key = k; const subs = subjectsOf(k); if (!subs.includes(cur.subject)) cur.subject = subs[0]; store(); drawPickers(); open(); }),
+      chipRow("Subject", subjectsOf(cur.key).map((x) => [x, x]), cur.subject, (x) => { cur.subject = x; store(); drawPickers(); open(); }), h("div", { class: "pickers2-s" }, saved));
+  }
   const tabs = h("div", { class: "subtabs", role: "tablist" }, [["scores", "Scores"], ["results", "Results"], ["students", "Students"], ["class", "Class"]].map(([id, l]) => h("button", { class: "tabbtn", role: "tab", "aria-selected": String(ui.tab === id), onclick: () => { ui.tab = id; tabs.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.textContent === l))); draw(); } }, l)));
-  mount(host, h("div", { class: "pickers" }, h("div", { class: "pick" }, h("label", { for: "sc_class" }, "Class"), classSel), h("div", { class: "pick" }, h("label", { for: "sc_subject" }, "Subject"), subjSel), saved), tabs, body);
+  drawPickers(); mount(host, pickers, tabs, body);
   const model = () => ({ ...toSheetModel(sheet || { subject: cur.subject, scores: {} }, roster), cls: classLabel(cur.key), teacher: sheet?.teacher || state.profile?.name || "", bonus: sheet?.bonus !== false });
   async function open() {
     mount(body, skeleton(5)); roster = null; unsub?.(); sheet = await loadSheet(session, cur.subject, cur.key).catch(() => null);
@@ -99,7 +104,7 @@ export async function scoresView(host) {
           h("fieldset", { class: "grp" }, h("legend", {}, "Exam"), mk("e", "Exam")),
           bonusOn ? h("fieldset", { class: "grp" }, h("legend", {}, "Bonus marks (added to the exam)"), h("div", { class: "trio" }, mk("at", "Attendance"), mk("tb", "Textbook"), mk("nb", "Notebook"))) : h("p", { class: "hint" }, "Bonus marks are switched off for this sheet."),
           live),
-        h("footer", { class: "sheet-f" }, h("span", { class: "chip sheet-saved" }, saved.textContent), h("div", { class: "stack-row" }, h("button", { class: "btn", type: "button", disabled: idx <= 0, onclick: () => go(-1) }, "‹ Previous"), h("button", { class: "btn", type: "button", disabled: idx >= order.length - 1, onclick: () => go(1) }, "Next ›"), h("button", { class: "btn btn-primary", type: "button", onclick: () => dlg.close() }, "Done")),
+        h("footer", { class: "sheet-f" }, h("span", { class: "chip sheet-saved" }, saved.textContent), h("span", { class: "hint" }, "Saves automatically when you close this."), h("div", { class: "stack-row" }, h("button", { class: "btn", type: "button", disabled: idx <= 0, onclick: () => go(-1) }, "‹ Previous"), h("button", { class: "btn", type: "button", disabled: idx >= order.length - 1, onclick: () => go(1) }, "Next ›"), h("button", { class: "btn btn-primary", type: "button", onclick: () => dlg.close() }, "Save")),
           h("button", { class: "linkbtn", type: "button", onclick: () => { dlg.close(); goToProgress({ studentId: id, mode: "subject", subject: cur.subject, key: cur.key }); } }, "View progress")));
       dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); }); dlg.addEventListener("close", () => { flush(); dlg.remove(); }); document.body.append(dlg); dlg.showModal(); refreshLive(); setTimeout(() => inputs[0]?.focus(), 60);
     }

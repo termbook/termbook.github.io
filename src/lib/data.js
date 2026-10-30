@@ -305,3 +305,21 @@ export async function rebuildStudentAttendance(session, students, termDays) {
   }
   await audit("attendance_rebuilt", sp("studentAttendance"), { students: n }); return n;
 }
+
+// ---- owner: replacing a school's admin ----
+const usersWhere = async (...conds) => { const s = await getDocs(query(col("users"), ...conds)); return s.docs.map((x) => ({ id: x.id, ...x.data() })); };
+export const adminsOf = (schoolId) => usersWhere(where("schoolId", "==", schoolId), where("role", "==", "admin"));
+export const teachersOfSchool = (schoolId) => usersWhere(where("schoolId", "==", schoolId), where("role", "==", "teacher"));
+export const findTeacherByEmail = (email) => usersWhere(where("email", "==", String(email).trim().toLowerCase()), where("role", "==", "teacher"));
+/**
+ * Makes a registered teacher the school's admin. The old admin either loses access or becomes a teacher waiting for the new admin's approval.
+ * oldAction: "remove" | "teacher".
+ */
+export async function replaceAdmin(school, newUser, oldAdmins, oldAction) {
+  const b = writeBatch(db); const clear = { classKeys: [], assignments: [], assignmentsList: [], classTeacherKey: null, classTeacher: null };
+  b.update(ref(`users/${newUser.id}`), { role: "admin", schoolId: school.id, status: "active", ...clear, updatedAt: serverTimestamp() });
+  for (const o of oldAdmins.filter((x) => x.id !== newUser.id)) b.update(ref(`users/${o.id}`), oldAction === "teacher" ? { role: "teacher", status: "pending", ...clear, requested: { classTeacher: null, assignments: [] }, updatedAt: serverTimestamp() } : { status: "removed", updatedAt: serverTimestamp() });
+  b.update(ref(`schools/${school.id}`), { adminUid: newUser.id });
+  await b.commit();
+  state.schoolId = school.id; await audit("admin_replaced", school.id, { to: newUser.email || newUser.id, from: oldAdmins.map((o) => o.email || o.id), oldAction }); state.schoolId = null;
+}

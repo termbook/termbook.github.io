@@ -72,6 +72,7 @@ async function boot() {
       if (!p) { if (await tryBootstrapOwner(user)) p = await loadProfile(user.uid); }
       if (!p) { setBare(true); return mount(view, onboardingView(user, () => location.reload())); }
       state.profile = p; state.isOwner = p.role === "owner";
+      if (p.role === "admin" && p.status !== "active") { setBare(true); return mount(view, waitingView("removed")); }
       if (p.role === "teacher" && p.status !== "active") { setBare(true); return mount(view, waitingView(p.status === "rejected" ? "rejected" : "pending")); }
       if ((p.role === "admin" || p.role === "teacher") && p.schoolId) state.school = await loadSchool(p.schoolId);
       if (p.role === "teacher" && state.school?.status === "pending") state.school.banner = true;

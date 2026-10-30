@@ -20,13 +20,11 @@ it("choose a class, then a subject of that class; tap a student to open the entr
   Object.assign(state, { isOwner: false, profile: { role: "teacher", name: "T", assignmentsList: [{ subject: "Mathematics", class: "SS2", arm: "A" }, { subject: "Biology", class: "SS2", arm: "A" }, { subject: "Basic Science", class: "JSS3", arm: "A" }] },
     school: { name: "Test School", current: { session: "2026/2027", term: 1 }, structure: { classes: [{ name: "SS2", arms: ["A"] }, { name: "JSS3", arms: ["A"] }] }, scoring: { weights: DEFAULT_WEIGHTS, grades: DEFAULT_GRADES } } });
   const host = document.createElement("div"); document.body.append(host); await scoresView(host); await tick();
-  // the two-step selector: classes first, then only the subjects of that class
-  const cls = host.querySelector("#sc_class"), subj = host.querySelector("#sc_subject");
-  expect([...cls.options].map((o) => o.textContent)).toEqual(["SS2A", "JSS3A"]);
-  expect([...subj.options].map((o) => o.textContent)).toEqual(["Mathematics", "Biology"]);
-  cls.value = "JSS3|A"; cls.dispatchEvent(new Event("change")); await tick(); expect([...host.querySelector("#sc_subject").options].map((o) => o.textContent)).toEqual(["Basic Science"]);
-  expect(host.querySelectorAll(".srow2").length).toBe(1);
-  cls.value = "SS2|A"; cls.dispatchEvent(new Event("change")); await tick();
+  // two steps: tap a class chip, then one of that class's subjects (never one long list of every class and subject)
+  const chips = (label) => [...host.querySelectorAll(`[aria-label="${label}"] button`)];
+  expect(chips("Class").map((b) => b.textContent)).toEqual(["SS2 A", "JSS3 A"]); expect(chips("Subject").map((b) => b.textContent)).toEqual(["Mathematics", "Biology"]);
+  chips("Class")[1].click(); await tick(); expect(chips("Subject").map((b) => b.textContent)).toEqual(["Basic Science"]); expect(host.querySelectorAll(".srow2").length).toBe(1);
+  chips("Class")[0].click(); await tick(); expect(chips("Subject")[0].getAttribute("aria-selected")).toBe("true");
   const rows = host.querySelectorAll(".srow2"); expect(rows.length).toBe(3);
   expect(host.querySelector("input[data-k]")).toBeNull();                         // no score boxes are shown until a student is opened
   expect(rows[0].textContent).toContain("Tap to enter scores");
@@ -40,7 +38,7 @@ it("choose a class, then a subject of that class; tap a student to open the entr
   [...dlg.querySelectorAll("button")].find((b) => b.textContent.includes("Next")).click(); await tick();      // opens the next student
   const dlg2 = document.querySelector("dialog.sheet-dlg"); expect(dlg2.textContent).toContain("CHUKWU OBI");   // the list shows males first, then females
   type(dlg2.querySelector('input[data-k="e"]'), "50"); expect(rows[1].textContent).toContain("1 of 4 entered");
-  [...dlg2.querySelectorAll("button")].find((b) => b.textContent === "Done").click(); await tick(700);
+  [...dlg2.querySelectorAll("button")].find((b) => b.textContent === "Save").click(); await tick(700);
   expect(document.querySelector("dialog.sheet-dlg")).toBeNull(); expect(saved.length).toBeGreaterThan(6);       // saved without pressing anything
   host.querySelectorAll(".subtabs button")[1].click(); await tick();
   const trs = [...host.querySelectorAll(".results tbody tr")]; expect(trs[0].querySelector("th").textContent).toBe("ADE BOLA"); expect(trs[0].querySelector(".posc").textContent).toContain("🥇");

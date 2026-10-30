@@ -7,7 +7,7 @@ import { validPhone } from "../lib/dates.js";
 import { dateSelect } from "../lib/datepick.js";
 
 const CONSENT_VERSION = "draft-1";
-const card = (...k) => h("div", { class: "card authcard" }, ...k);
+const card = (...k) => h("div", { class: "card authcard" }, h("div", { class: "auth-brand" }, h("img", { src: "/assets/icons/logo.svg", width: 40, height: 40, alt: "" }), h("span", {}, "Termbook")), ...k);
 const consentBox = () => h("label", { class: "chk consent" }, h("input", { type: "checkbox", id: "consent" }),
   h("span", {}, "I have read the ", h("a", { href: "/privacy.html", target: "_blank", rel: "noopener" }, "privacy notice (draft)"), " and agree that Termbook may process this information to run the service, in line with the Nigeria Data Protection Act 2023."));
 
@@ -57,6 +57,7 @@ export function verifyView(user, onDone) {
 export function waitingView(kind, user) {
   const t = { pending: ["Waiting for approval", "Your school's admin must approve you before you can see any school data. Ask them to open Teachers and approve your request."],
     rejected: ["Request not approved", "Your school's admin did not approve this request. Speak to them if you think this is a mistake."],
+    removed: ["Admin access removed", "The platform owner has replaced the admin of this school. Contact the platform owner if you think this is a mistake."],
     school: ["School waiting for verification", "The platform owner has not verified your school yet. Teachers can find your school only after it is verified. You can set up classes and subjects meanwhile."] }[kind];
   return card(h("h1", {}, t[0]), h("p", {}, t[1]), h("button", { class: "btn", type: "button", onclick: () => signOut(auth) }, "Log out"));
 }

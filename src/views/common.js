@@ -11,7 +11,7 @@ export function select(options, value, props = {}) {
   return s;
 }
 export const allArms = (structure) => structure.classes.flatMap((c) => armsOf(c).map((a) => ({ cls: c.name, arm: a, key: classKey(c.name, a) })));
-export const classLabel = (k) => String(k).replace("|", "");
+export const classLabel = (k) => String(k).replace("|", " ").trim();
 
 /** Class + arm dropdown from the school's own list. */
 export function classPicker(structure, value, { blank = "Choose class and arm" } = {}) {

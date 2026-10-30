@@ -68,3 +68,10 @@ Each student's own attendance record (what a parent sees) follows the class regi
 
 ## Parents
 Parents can link several children (even at different schools) with one account, see progress charts and published report cards, follow attendance and send absence notes, and update their child's family, health and emergency details. You can see what they entered when you open the student. **Revoke access** on a student removes the link.
+
+## Replacing a school's admin (platform owner only)
+Open **Schools**, find the school and press **Replace admin**.
+1. The new admin must already have an account and have joined the school as a teacher (**Register**, then **I am a teacher joining my school**). They then appear in the list. You can also find a teacher by email; a teacher from another school is moved to this one.
+2. Choose what happens to the current admin: **Remove their access**, or **Keep them as a teacher** (the new admin approves their roles).
+3. Confirm. The change takes effect straight away and is written to the audit log.
+School admins cannot do this themselves.

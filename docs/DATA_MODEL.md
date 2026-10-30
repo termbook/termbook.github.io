@@ -7,7 +7,7 @@ Every school's data lives under `schools/{schoolId}/...`. Access is decided by `
 | `config/platform` | `requireVerification` | any signed-in user | owner |
 | `config/holidays` | national holidays | any signed-in user | owner |
 | `publicSchools/{sid}` | name, state, LGA, class and subject lists | anyone | owner; admin (own, verified) |
-| `users/{uid}` | role, school, status, class teacher key, assignments, `links` (parents) | self, school admin, owner | self (limited), admin (teachers), owner |
+| `users/{uid}` | role, school, status (the owner can replace an admin by changing these), class teacher key, assignments, `links` (parents) | self, school admin, owner | self (limited), admin (teachers), owner |
 | `schools/{sid}` | details, structure, scoring, report card settings, logos and signature, current session and term, status | school staff, owner | admin (not status), owner |
 | `schools/{sid}/students/{admissionKey}` | name, gender, class, arm, `classKey`, status, repeater, soft-delete flag | admin, owner, teachers of that class, linked parent | admin, owner, class teacher (pending only) |
 | `.../students/{id}/private/info` | home address, origin, previous school, parent/guardian, father, mother and emergency contact details, health details, transport and notes, religion (optional) | admin, owner, class teacher, the linked parent | same, and the linked parent (family, health, emergency and address details only) |

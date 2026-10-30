@@ -30,7 +30,7 @@ it("shows a saved pair that the school does not offer, so it can be unticked", (
   const structure = { classes: ["JSS3", "SS2"].map((name) => ({ name, arms: ["A"] })) };
   const rp = rolePicker(structure, { assignments: [{ subject: "Basic Science", class: "SS2", arm: "A" }, { subject: "Basic Science", class: "JSS3", arm: "A" }] });
   document.body.append(rp.el);
-  const warn = rp.el.querySelector(".fs-warn"); expect(warn).not.toBeNull(); expect(warn.textContent).toContain("Basic Science, SS2A");
+  const warn = rp.el.querySelector(".fs-warn"); expect(warn).not.toBeNull(); expect(warn.textContent).toContain("Basic Science, SS2 A");
   warn.querySelector("input").click();
   expect(rp.get().assignments).toEqual([{ subject: "Basic Science", class: "JSS3", arm: "A" }]);
 });

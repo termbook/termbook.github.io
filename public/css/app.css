@@ -195,3 +195,18 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary)
 /* register: roomier rows on phones */
 @media (max-width:640px){.reg-row{min-height:64px;border-radius:18px;padding:var(--space-2) var(--space-3);box-shadow:0 1px 2px rgba(22,26,46,.05)}.reg-head,.reg-row{grid-template-columns:1fr 60px 60px}.datebar{gap:var(--space-2)}.rings{gap:var(--space-2)}}
 @media (prefers-reduced-motion:reduce){#view{animation:none}}
+
+/* class and subject chips on the Scores screen, and names that are never cut off */
+.pickers2{display:flex;flex-direction:column;gap:var(--space-2);margin:var(--space-3) 0}.chiprow{display:flex;align-items:center;gap:var(--space-3);min-width:0}.chiplabel{flex:none;width:4.2rem;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)}
+.chiprow .chips{padding:2px 0;flex:1;min-width:0}.chiprow .chips button{min-height:44px;flex-direction:row}.pickers2-s{align-self:flex-start}
+.srow2 .who strong,.row-card strong,.sheet-h strong,.stack-table th[scope=row],.results tbody th{white-space:normal;overflow-wrap:anywhere;word-break:normal;line-height:1.25}
+.srow2 .who{min-width:0;flex:1 1 0}.sheet-h .grow{min-width:0}.sheet-f .hint{text-align:center}
+@media (max-width:560px){.chiprow{align-items:flex-start;flex-direction:column;gap:2px}.chiplabel{width:auto;padding-left:4px}.chiprow .chips{width:100%}}
+
+/* ---- Sign-in screens, dashboard cards and empty states ---- */
+.auth-brand{display:flex;align-items:center;gap:var(--space-3);font:800 1.25rem/1 var(--font-body);margin-bottom:var(--space-4)}.auth-brand img{border-radius:12px;box-shadow:0 8px 20px -10px var(--primary)}
+.authcard{padding:var(--space-5);box-shadow:0 24px 60px -30px rgba(22,26,46,.45)}.authcard .btn-block{min-height:52px;font-size:1.05rem}
+@media (max-width:560px){.shell.bare #view{padding:var(--space-3)}.authcard{margin:var(--space-3) 0;border-radius:24px}}
+.stats .stat,.stat{border-radius:20px;padding:var(--space-4);background:linear-gradient(160deg,var(--surface),color-mix(in srgb,var(--surface) 90%,var(--primary-soft)));box-shadow:0 1px 2px rgba(22,26,46,.05),0 8px 24px -18px rgba(22,26,46,.3);transition:transform var(--dur-1) var(--ease),box-shadow var(--dur-2)}.stat:hover{transform:translateY(-2px)}.stat .v{font-size:var(--step-3);letter-spacing:-.02em}
+.empty{background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--surface) 70%,transparent));border-radius:24px}
+.chip{backdrop-filter:blur(6px)}.sheet-saved{background:var(--success-soft);color:var(--success)}

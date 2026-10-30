@@ -180,6 +180,19 @@ describe("student management", () => {
     await assertFails(getDoc(note(as("ctch"), "st1_2026-09-21"))); await assertFails(getDoc(note(as("parent2"), "st1_2026-09-21")));
     await assertSucceeds(deleteDoc(note(as("parent1"), "st1_2026-09-21")));
   });
+  it("only the owner can replace a school's admin", async () => {
+    await assertSucceeds(updateDoc(doc(as("owner1"), "users/ctch"), { role: "admin", schoolId: "s1", status: "active" }));
+    await assertSucceeds(updateDoc(doc(as("owner1"), "users/adm1"), { status: "removed" }));
+    await assertSucceeds(updateDoc(doc(as("owner1"), "schools/s1"), { adminUid: "ctch" }));
+    await assertFails(getDoc(doc(as("adm1"), "schools/s1")));                                            // the removed admin loses access straight away
+    await assertSucceeds(getDoc(doc(as("ctch"), "schools/s1")));                                         // and the new admin has it
+  });
+  it("an admin cannot hand their school to someone else or promote a teacher", async () => {
+    const a = as("adm1");
+    await assertFails(updateDoc(doc(a, "schools/s1"), { adminUid: "ctch" }));
+    await assertFails(updateDoc(doc(a, "users/ctch"), { role: "admin" }));
+    await assertFails(updateDoc(doc(as("ctch"), "users/ctch"), { role: "admin" }));
+  });
   it("a subject teacher can list only the classes they teach", async () => {
     const db = as("subj");
     await assertSucceeds(getDocs(query(collection(db, "schools/s1/students"), where("classKey", "==", "SS2|A"))));
