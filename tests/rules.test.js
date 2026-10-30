@@ -73,7 +73,7 @@ describe("required rules", () => {
     const db = as("parent1");
     await assertSucceeds(getDoc(doc(db, "schools/s1/students/st1")));
     await assertFails(getDoc(doc(db, "schools/s1/students/st2")));
-    await assertFails(getDoc(doc(db, "schools/s1/students/st1/private/info")));
+    await assertSucceeds(getDoc(doc(db, "schools/s1/students/st1/private/info")));   // parents can read their own child's private details
     await assertFails(getDoc(doc(db, "schools/s1/reports/t1_st1")));
     await assertSucceeds(getDoc(doc(db, "schools/s1/reports/t2_st1")));
     await assertFails(getDoc(doc(db, "schools/s1/sheets/math")));
