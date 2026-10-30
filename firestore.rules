@@ -97,7 +97,7 @@ service cloud.firestore {
             || isClassTeacher(sid, get(/databases/$(db)/documents/schools/$(sid)/students/$(id)).data.classKey)
             || (doc == 'info' && linkedParent(sid, id));
           allow create, update: if isOwner() || isAdmin(sid)
-            || isClassTeacher(sid, get(/databases/$(db)/documents/schools/$(sid)/students/$(id)).data.classKey)
+            || isClassTeacher(sid, getAfter(/databases/$(db)/documents/schools/$(sid)/students/$(id)).data.classKey)
             || (doc == 'info' && linkedParent(sid, id)
                 && request.resource.data.keys().hasOnly(['stateOfOrigin', 'lgaOfOrigin', 'nationality', 'previousSchool', 'address', 'relationship', 'phone', 'email',
                      'fatherName', 'fatherPhone', 'fatherOccupation', 'motherName', 'motherPhone', 'motherOccupation', 'emergencyName', 'emergencyRelationship', 'emergencyPhone',
